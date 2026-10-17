@@ -27,11 +27,17 @@
         .btn { display: block; width: 100%; padding: 14px; background: var(--primary); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; text-align: center; }
         .btn:disabled { background: #3a3a4f; color: var(--text-secondary); cursor: not-allowed; }
         .file-list { font-size: 13px; color: var(--text-secondary); margin-top: 8px; max-height: 100px; overflow-y: auto; }
+        
+        /* 預覽與播放控制區 */
         .preview-container { width: 100%; background: #000; border-radius: 10px; overflow: hidden; position: relative; aspect-ratio: 9/16; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); }
         canvas#previewCanvas { width: 100%; height: 100%; object-fit: contain; }
-        .time-inputs { display: flex; gap: 10px; margin-bottom: 12px; }
-        .time-inputs div { flex: 1; }
-        input[type="number"] { width: 100%; padding: 8px; background: #12121a; border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; }
+        .preview-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .mini-btn { background: #2c2c3e; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+
+        /* 視覺化時間軸拉桿 (Trim Slider) */
+        .slider-group { background: #12121a; padding: 12px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 12px; }
+        .slider-title { font-size: 12px; color: var(--text-secondary); display: flex; justify-content: space-between; margin-bottom: 6px; }
+        
         .progress-box { margin-top: 12px; display: none; }
         .progress-bar-bg { width: 100%; height: 8px; background: #12121a; border-radius: 4px; overflow: hidden; margin-top: 6px; }
         .progress-bar-fill { width: 0%; height: 100%; background: var(--primary); transition: width 0.2s; }
@@ -44,37 +50,57 @@
 <body>
 
     <h1>✨ 演唱會 4K 影片浮水印工具</h1>
-    <div class="subtitle">支援 BOICE 專屬雙浮水印 ｜ 即時預覽 ｜ 獨立下載防呆</div>
+    <div class="subtitle">視覺化拖曳剪輯 ｜ 浮水印切換 ｜ 防呆獨立下載</div>
 
-    <!-- 步驟 1：選擇影片與剪輯範圍 -->
+    <!-- 步驟 1：選擇影片與時間軸剪輯 -->
     <div class="card">
-        <h2>📁 1. 選擇影片與設定範圍</h2>
+        <h2>📁 1. 選擇影片與剪輯範圍</h2>
         <label class="file-upload-btn" for="videoInput">點此從手機相簿選取影片</label>
         <input type="file" id="videoInput" accept="video/*" multiple style="display: none;">
         <div id="fileList" class="file-list">尚未選擇檔案</div>
 
         <div id="clipSection" style="display: none; margin-top: 14px;">
-            <label>剪輯影片範圍 (秒數)</label>
-            <div class="time-inputs">
-                <div>
-                    <label style="font-size: 11px;">開始時間</label>
-                    <input type="number" id="startTime" value="0" min="0" step="0.1">
+            <div class="slider-group">
+                <div class="slider-title">
+                    <span>🎬 開始位置</span>
+                    <span id="startDisp">0.0 秒</span>
                 </div>
-                <div>
-                    <label style="font-size: 11px;">結束時間 (0代表結尾)</label>
-                    <input type="number" id="endTime" value="0" min="0" step="0.1">
+                <input type="range" id="startSlider" min="0" max="100" value="0" step="0.1" oninput="onRangeChange('start')">
+
+                <div class="slider-title" style="margin-top: 10px;">
+                    <span>🏁 結束位置</span>
+                    <span id="endDisp">0.0 秒</span>
                 </div>
+                <input type="range" id="endSlider" min="0" max="100" value="100" step="0.1" oninput="onRangeChange('end')">
             </div>
+            <div style="font-size: 11px; color: var(--text-secondary); text-align: center;">💡 剪輯範圍設定會套用到本次批次匯出的所有影片</div>
         </div>
     </div>
 
-    <!-- 步驟 2：浮水印即時預覽與設定 -->
+    <!-- 步驟 2：浮水印選取與即時預覽 -->
     <div class="card">
-        <h2>👁️ 2. 浮水印即時預覽與設定</h2>
+        <h2>👁️ 2. 選擇浮水印與即時預覽</h2>
         
-        <!-- 畫布即時預覽區 -->
         <div class="preview-container">
             <canvas id="previewCanvas"></canvas>
+        </div>
+
+        <div class="preview-controls">
+            <button class="mini-btn" id="playBtn" onclick="togglePlay()">▶️ 預覽播放範圍</button>
+            <span style="font-size: 11px; color: var(--text-secondary);" id="timeDisplay">00:00 / 00:00</span>
+        </div>
+
+        <!-- 浮水印文字選擇 -->
+        <label for="watermarkPreset">選擇浮水印內容</label>
+        <select id="watermarkPreset" onchange="onPresetChange()">
+            <option value="boice114forever">boice114forever</option>
+            <option value="joyce8651">joyce8651</option>
+            <option value="custom">自訂其他文字...</option>
+        </select>
+
+        <div id="customTextGroup" style="display: none;">
+            <label for="customWatermarkText">輸入自訂浮水印</label>
+            <input type="text" id="customWatermarkText" placeholder="輸入浮水印文字" oninput="updatePreview()">
         </div>
 
         <label for="watermarkPosition">位置</label>
@@ -89,11 +115,11 @@
         <label>透明度 (<span id="opacityVal">80</span>%)</label>
         <input type="range" id="watermarkOpacity" min="10" max="100" value="80" oninput="document.getElementById('opacityVal').innerText=this.value; updatePreview();">
 
-        <label>字體大小 (<span id="sizeVal">20</span>px)</label>
-        <input type="range" id="watermarkSize" min="12" max="50" value="20" oninput="document.getElementById('sizeVal').innerText=this.value; updatePreview();">
+        <label>字體大小 (<span id="sizeVal">24</span>px)</label>
+        <input type="range" id="watermarkSize" min="12" max="60" value="24" oninput="document.getElementById('sizeVal').innerText=this.value; updatePreview();">
     </div>
 
-    <!-- 步驟 3：開始處理與防呆下載區 -->
+    <!-- 步驟 3：匯出與下載 -->
     <div class="card">
         <h2>🚀 3. 輸出與下載專區</h2>
         <button id="processBtn" class="btn" disabled>開始批次製作浮水印</button>
@@ -107,7 +133,7 @@
         </div>
 
         <div id="downloadContainer" style="margin-top: 14px;">
-            <!-- 獨立下載清單，處理好一支就馬上有下載按鈕，不怕跳掉！ -->
+            <!-- 處理完成的影片會自動在此生成下載按鈕 -->
         </div>
     </div>
 
@@ -121,8 +147,14 @@
         const progressPercent = document.getElementById('progressPercent');
         const downloadContainer = document.getElementById('downloadContainer');
         const clipSection = document.getElementById('clipSection');
-        const startTimeInput = document.getElementById('startTime');
-        const endTimeInput = document.getElementById('endTime');
+
+        const startSlider = document.getElementById('startSlider');
+        const endSlider = document.getElementById('endSlider');
+        const startDisp = document.getElementById('startDisp');
+        const endDisp = document.getElementById('endDisp');
+        const playBtn = document.getElementById('playBtn');
+        const timeDisplay = document.getElementById('timeDisplay');
+
         const previewCanvas = document.getElementById('previewCanvas');
         const ctx = previewCanvas.getContext('2d');
 
@@ -131,6 +163,8 @@
         previewVideo.muted = true;
         previewVideo.playsInline = true;
 
+        let animFrameId = null;
+
         videoInput.addEventListener('change', (e) => {
             selectedFiles = Array.from(e.target.files);
             if (selectedFiles.length > 0) {
@@ -138,12 +172,21 @@
                 processBtn.disabled = false;
                 clipSection.style.display = 'block';
 
-                // 載入第一支影片作為預覽用
                 previewVideo.src = URL.createObjectURL(selectedFiles[0]);
                 previewVideo.onloadedmetadata = () => {
                     previewCanvas.width = 1080;
                     previewCanvas.height = 1920;
-                    endTimeInput.value = previewVideo.duration.toFixed(1);
+
+                    const dur = previewVideo.duration;
+                    startSlider.max = dur;
+                    endSlider.max = dur;
+                    startSlider.value = 0;
+                    endSlider.value = dur;
+
+                    startDisp.innerText = '0.0 秒';
+                    endDisp.innerText = dur.toFixed(1) + ' 秒';
+
+                    previewVideo.currentTime = 0;
                     updatePreview();
                 };
             } else {
@@ -153,39 +196,106 @@
             }
         });
 
-        function updatePreview() {
-            if (!previewVideo.src) return;
-            const srcWidth = previewVideo.videoWidth || 1920;
-            const srcHeight = previewVideo.videoHeight || 1080;
+        function onPresetChange() {
+            const preset = document.getElementById('watermarkPreset').value;
+            const customGroup = document.getElementById('customTextGroup');
+            customGroup.style.display = (preset === 'custom') ? 'block' : 'none';
+            updatePreview();
+        }
 
-            let targetWidth = 1080;
-            let targetHeight = 1920;
+        function getActiveWatermarkText() {
+            const preset = document.getElementById('watermarkPreset').value;
+            if (preset === 'custom') {
+                return document.getElementById('customWatermarkText').value || 'Watermark';
+            }
+            return preset;
+        }
 
-            // 算 9:16 居中裁切
-            const sAspect = srcWidth / srcHeight;
-            const tAspect = 9 / 16;
-            let sw = srcWidth, sh = srcHeight, sx = 0, sy = 0;
+        function onRangeChange(type) {
+            let start = parseFloat(startSlider.value);
+            let end = parseFloat(endSlider.value);
 
-            if (sAspect > tAspect) {
-                sw = srcHeight * tAspect;
-                sx = (srcWidth - sw) / 2;
-            } else {
-                sh = srcWidth / tAspect;
-                sy = (srcHeight - sh) / 2;
+            if (start >= end) {
+                if (type === 'start') startSlider.value = (end - 0.5 > 0) ? end - 0.5 : 0;
+                else endSlider.value = start + 0.5;
             }
 
+            start = parseFloat(startSlider.value);
+            end = parseFloat(endSlider.value);
+
+            startDisp.innerText = start.toFixed(1) + ' 秒';
+            endDisp.innerText = end.toFixed(1) + ' 秒';
+
+            previewVideo.currentTime = (type === 'start') ? start : end;
+            updatePreview();
+        }
+
+        function togglePlay() {
+            if (previewVideo.paused) {
+                const start = parseFloat(startSlider.value);
+                const end = parseFloat(endSlider.value);
+                if (previewVideo.currentTime < start || previewVideo.currentTime >= end) {
+                    previewVideo.currentTime = start;
+                }
+                previewVideo.play();
+                playBtn.innerText = '⏸️ 暫停預覽';
+                renderLoop();
+            } else {
+                previewVideo.pause();
+                playBtn.innerText = '▶️ 預覽播放範圍';
+                if (animFrameId) cancelAnimationFrame(animFrameId);
+            }
+        }
+
+        function renderLoop() {
+            if (previewVideo.paused || previewVideo.ended) return;
+
+            const end = parseFloat(endSlider.value);
+            if (previewVideo.currentTime >= end) {
+                previewVideo.pause();
+                playBtn.innerText = '▶️ 預覽播放範圍';
+                previewVideo.currentTime = parseFloat(startSlider.value);
+                updatePreview();
+                return;
+            }
+
+            updatePreview();
+            timeDisplay.innerText = `${previewVideo.currentTime.toFixed(1)}s / ${parseFloat(endSlider.value).toFixed(1)}s`;
+            animFrameId = requestAnimationFrame(renderLoop);
+        }
+
+        function updatePreview() {
+            const targetWidth = 1080;
+            const targetHeight = 1920;
+
             ctx.clearRect(0, 0, targetWidth, targetHeight);
-            
-            // 繪製模擬背景或預覽畫面
             ctx.fillStyle = '#12121a';
             ctx.fillRect(0, 0, targetWidth, targetHeight);
 
+            if (previewVideo.readyState >= 2) {
+                const srcWidth = previewVideo.videoWidth;
+                const srcHeight = previewVideo.videoHeight;
+
+                const sAspect = srcWidth / srcHeight;
+                const tAspect = 9 / 16;
+                let sw = srcWidth, sh = srcHeight, sx = 0, sy = 0;
+
+                if (sAspect > tAspect) {
+                    sw = srcHeight * tAspect;
+                    sx = (srcWidth - sw) / 2;
+                } else {
+                    sh = srcWidth / tAspect;
+                    sy = (srcHeight - sh) / 2;
+                }
+
+                ctx.drawImage(previewVideo, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
+            }
+
+            // 繪製單一浮水印
+            const text = getActiveWatermarkText();
             const position = document.getElementById('watermarkPosition').value;
             const opacity = document.getElementById('watermarkOpacity').value / 100;
             const fontSize = parseInt(document.getElementById('watermarkSize').value);
-
-            // 雙浮水印內容：boice114forever 與 joyce8651
-            const texts = ["boice114forever", "joyce8651"];
 
             ctx.save();
             ctx.globalAlpha = opacity;
@@ -195,34 +305,29 @@
             ctx.shadowBlur = 6;
 
             const padding = 30;
-            let currentYOffset = 0;
+            const metrics = ctx.measureText(text);
+            const textWidth = metrics.width;
+            const textHeight = fontSize;
+            let x = padding, y = targetHeight - padding;
 
-            texts.forEach((text, index) => {
-                const metrics = ctx.measureText(text);
-                const textWidth = metrics.width;
-                const textHeight = fontSize;
-                let x = padding, y = targetHeight - padding;
+            if (position === 'bottom-right') {
+                x = targetWidth - textWidth - padding;
+                y = targetHeight - padding;
+            } else if (position === 'bottom-left') {
+                x = padding;
+                y = targetHeight - padding;
+            } else if (position === 'top-right') {
+                x = targetWidth - textWidth - padding;
+                y = padding + textHeight;
+            } else if (position === 'top-left') {
+                x = padding;
+                y = padding + textHeight;
+            } else if (position === 'center') {
+                x = (targetWidth - textWidth) / 2;
+                y = targetHeight / 2;
+            }
 
-                if (position === 'bottom-right') {
-                    x = targetWidth - textWidth - padding;
-                    y = targetHeight - padding - (texts.length - 1 - index) * (fontSize + 8);
-                } else if (position === 'bottom-left') {
-                    x = padding;
-                    y = targetHeight - padding - (texts.length - 1 - index) * (fontSize + 8);
-                } else if (position === 'top-right') {
-                    x = targetWidth - textWidth - padding;
-                    y = padding + textHeight + (index * (fontSize + 8));
-                } else if (position === 'top-left') {
-                    x = padding;
-                    y = padding + textHeight + (index * (fontSize + 8));
-                } else if (position === 'center') {
-                    x = (targetWidth - textWidth) / 2;
-                    y = (targetHeight / 2) + (index * (fontSize + 10)) - 15;
-                }
-
-                ctx.fillText(text, x, y);
-            });
-
+            ctx.fillText(text, x, y);
             ctx.restore();
         }
 
@@ -235,20 +340,20 @@
             const position = document.getElementById('watermarkPosition').value;
             const opacity = document.getElementById('watermarkOpacity').value / 100;
             const fontSize = parseInt(document.getElementById('watermarkSize').value);
-            const startTime = parseFloat(startTimeInput.value) || 0;
-            const endTimeCustom = parseFloat(endTimeInput.value) || 0;
+            const text = getActiveWatermarkText();
+            const startTime = parseFloat(startSlider.value);
+            const endTime = parseFloat(endSlider.value);
 
             for (let i = 0; i < selectedFiles.length; i++) {
                 const file = selectedFiles[i];
                 progressStatus.innerText = `正在處理 (${i + 1}/${selectedFiles.length}): ${file.name}`;
                 
                 try {
-                    await processVideo(file, position, opacity, fontSize, startTime, endTimeCustom, (progress) => {
+                    await processVideo(file, text, position, opacity, fontSize, startTime, endTime, (progress) => {
                         const percent = Math.round(progress * 100);
                         progressBarFill.style.width = `${percent}%`;
                         progressPercent.innerText = `${percent}%`;
                     }, (downloadUrl, fileName) => {
-                        // 防呆機制：每完成一支影片，立刻產生一個獨立下載區塊！
                         const item = document.createElement('div');
                         item.className = 'download-item';
                         item.innerHTML = `<span>✅ ${fileName}</span><a class="download-btn" href="${downloadUrl}" download="${fileName}">立即下載</a>`;
@@ -264,7 +369,7 @@
             processBtn.disabled = false;
         });
 
-        function processVideo(file, position, opacity, fontSize, startTime, endTimeCustom, onProgress, onComplete) {
+        function processVideo(file, text, position, opacity, fontSize, startTime, endTime, onProgress, onComplete) {
             return new Promise((resolve, reject) => {
                 const video = document.createElement('video');
                 video.src = URL.createObjectURL(file);
@@ -275,8 +380,7 @@
                 video.onloadedmetadata = () => {
                     const srcWidth = video.videoWidth;
                     const srcHeight = video.videoHeight;
-                    const duration = video.duration;
-                    const endTime = (endTimeCustom > 0 && endTimeCustom < duration) ? endTimeCustom : duration;
+                    const actualEndTime = (endTime > 0 && endTime <= video.duration) ? endTime : video.duration;
 
                     let targetHeight = 1920;
                     let targetWidth = 1080;
@@ -320,7 +424,7 @@
                         video.play();
 
                         function drawFrame() {
-                            if (video.paused || video.ended || video.currentTime >= endTime) {
+                            if (video.paused || video.ended || video.currentTime >= actualEndTime) {
                                 video.pause();
                                 if (mediaRecorder.state !== 'inactive') {
                                     mediaRecorder.stop();
@@ -343,8 +447,7 @@
                             ctx.clearRect(0, 0, targetWidth, targetHeight);
                             ctx.drawImage(video, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
 
-                            // 繪製雙浮水印 (boice114forever 與 joyce8651)
-                            const texts = ["boice114forever", "joyce8651"];
+                            // 繪製選擇的單一浮水印
                             ctx.save();
                             ctx.globalAlpha = opacity;
                             ctx.font = `${fontSize * (targetHeight / 1080)}px sans-serif`;
@@ -353,34 +456,32 @@
                             ctx.shadowBlur = 6;
 
                             const padding = 30;
-                            texts.forEach((text, index) => {
-                                const metrics = ctx.measureText(text);
-                                const textWidth = metrics.width;
-                                const textHeight = fontSize;
-                                let x = padding, y = targetHeight - padding;
+                            const metrics = ctx.measureText(text);
+                            const textWidth = metrics.width;
+                            const textHeight = fontSize;
+                            let x = padding, y = targetHeight - padding;
 
-                                if (position === 'bottom-right') {
-                                    x = targetWidth - textWidth - padding;
-                                    y = targetHeight - padding - (texts.length - 1 - index) * (fontSize + 8);
-                                } else if (position === 'bottom-left') {
-                                    x = padding;
-                                    y = targetHeight - padding - (texts.length - 1 - index) * (fontSize + 8);
-                                } else if (position === 'top-right') {
-                                    x = targetWidth - textWidth - padding;
-                                    y = padding + textHeight + (index * (fontSize + 8));
-                                } else if (position === 'top-left') {
-                                    x = padding;
-                                    y = padding + textHeight + (index * (fontSize + 8));
-                                } else if (position === 'center') {
-                                    x = (targetWidth - textWidth) / 2;
-                                    y = (targetHeight / 2) + (index * (fontSize + 10)) - 15;
-                                }
+                            if (position === 'bottom-right') {
+                                x = targetWidth - textWidth - padding;
+                                y = targetHeight - padding;
+                            } else if (position === 'bottom-left') {
+                                x = padding;
+                                y = targetHeight - padding;
+                            } else if (position === 'top-right') {
+                                x = targetWidth - textWidth - padding;
+                                y = padding + textHeight;
+                            } else if (position === 'top-left') {
+                                x = padding;
+                                y = padding + textHeight;
+                            } else if (position === 'center') {
+                                x = (targetWidth - textWidth) / 2;
+                                y = targetHeight / 2;
+                            }
 
-                                ctx.fillText(text, x, y);
-                            });
+                            ctx.fillText(text, x, y);
                             ctx.restore();
 
-                            const progress = (video.currentTime - startTime) / (endTime - startTime);
+                            const progress = (video.currentTime - startTime) / (actualEndTime - startTime);
                             onProgress(Math.min(Math.max(progress, 0), 1));
                             requestAnimationFrame(drawFrame);
                         }
