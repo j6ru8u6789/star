@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4K 60fps 演唱會影片批次浮水印工具</title>
+    <style>
+        :root {
+            --primary: #ff2d55;
+            --bg: #0f0f13;
+            --card-bg: #1a1a24;
+            --text: #ffffff;
+            --text-secondary: #a0a0b0;
+            --border: #2c2c3e;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background: var(--bg); color: var(--text); padding: 20px; max-width: 600px; margin: 0 auto; }
+        h1 { font-size: 20px; margin-bottom: 6px; text-align: center; color: var(--primary); }
+        .subtitle { font-size: 12px; color: var(--text-secondary); text-align: center; margin-bottom: 20px; }
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin-bottom: 16px; }
+        .card h2 { font-size: 15px; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+        label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
+        input[type="text"], select { width: 100%; padding: 10px; background: #12121a; border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; margin-bottom: 12px; }
+        input[type="range"] { width: 100%; accent-color: var(--primary); margin-bottom: 6px; }
+        .range-val { text-align: right; font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; }
+        .file-upload-btn { display: block; width: 100%; padding: 14px; background: #252536; border: 2px dashed var(--primary); border-radius: 12px; text-align: center; color: var(--text); font-weight: 600; cursor: pointer; margin-bottom: 8px; }
+        .btn { display: block; width: 100%; padding: 14px; background: var(--primary); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; text-align: center; }
+        .btn:disabled { background: #3a3a4f; color: var(--text-secondary); cursor: not-allowed; }
+        .file-list { font-size: 13px; color: var(--text-secondary); margin-top: 8px; max-height: 100px; overflow-y: auto; }
+        .progress-box { margin-top: 12px; display: none; }
+        .progress-bar-bg { width: 100%; height: 8px; background: #12121a; border-radius: 4px; overflow: hidden; margin-top: 6px; }
+        .progress-bar-fill { width: 0%; height: 100%; background: var(--primary); transition: width 0.2s; }
+        .status-text { font-size: 12px; color: var(--text-secondary); margin-top: 6px; text-align: right; }
+    </style>
+</head>
+<body>
+
+    <h1>✨ 演唱會 4K 影片浮水印工具</h1>
+    <div class="subtitle">支援 iPhone / 三星 ｜ 零畫質損耗 ｜ 9:16 自動排版</div>
+
+    <!-- 步驟 1：選擇影片 -->
+    <div class="card">
+        <h2>📁 1. 選擇 4K 影片 (可多選)</h2>
+        <label class="file-upload-btn" for="videoInput">點此從手機相簿選取影片</label>
+        <input type="file" id="videoInput" accept="video/*" multiple style="display: none;">
+        <div id="fileList" class="file-list">尚未選擇檔案</div>
+    </div>
+
+    <!-- 步驟 2：設定浮水印 -->
+    <div class="card">
+        <h2>✍️ 2. 浮水印設定</h2>
+        <label for="watermarkText">文字內容 (例如你的 IG / Twitter ID)</label>
+        <input type="text" id="watermarkText" value="@Joyce8651" placeholder="輸入浮水印文字">
+
+        <label for="watermarkPosition">位置</label>
+        <select id="watermarkPosition">
+            <option value="bottom-right">右下角</option>
+            <option value="bottom-left">左下角</option>
+            <option value="top-right">右上角</option>
+            <option value="top-left">左上角</option>
+            <option value="center">置中 (半透明)</option>
+        </select>
+
+        <label>透明度 (<span id="opacityVal">70</span>%)</label>
+        <input type="range" id="watermarkOpacity" min="10" max="100" value="70" oninput="document.getElementById('opacityVal').innerText=this.value">
+
+        <label>字體大小 (<span id="sizeVal">24</span>px)</label>
+        <input type="range" id="watermarkSize" min="14" max="60" value="24" oninput="document.getElementById('sizeVal').innerText=this.value">
+    </div>
+
+    <!-- 步驟 3：開始處理與下載 -->
+    <div class="card">
+        <h2>🚀 3. 輸出 9:16 影片</h2>
+        <button id="processBtn" class="btn" disabled>開始批次製作浮水印</button>
+        
+        <div id="progressBox" class="progress-box">
+            <div id="progressStatus" style="font-size: 13px;">準備處理...</div>
+            <div class="progress-bar-bg">
+                <div id="progressBarFill" class="progress-bar-fill"></div>
+            </div>
+            <div id="progressPercent" class="status-text">0%</div>
+        </div>
+    </div>
+
+    <script>
+        const videoInput = document.getElementById('videoInput');
+        const fileList = document.getElementById('fileList');
+        const processBtn = document.getElementById('processBtn');
+        const progressBox = document.getElementById('progressBox');
+        const progressBarFill = document.getElementById('progressBarFill');
+        const progressStatus = document.getElementById('progressStatus');
+        const progressPercent = document.getElementById('progressPercent');
+
+        let selectedFiles = [];
+
+        videoInput.addEventListener('change', (e) => {
+            selectedFiles = Array.from(e.target.files);
+            if (selectedFiles.length > 0) {
+                fileList.innerHTML = `已選擇 ${selectedFiles.length} 個檔案：<br>` + selectedFiles.map(f => `• ${f.name}`).join('<br>');
+                processBtn.disabled = false;
+            } else {
+                fileList.innerHTML = '尚未選擇檔案';
+                processBtn.disabled = true;
+            }
+        });
+
+        processBtn.addEventListener('click', async () => {
+            if (selectedFiles.length === 0) return;
+
+            processBtn.disabled = true;
+            progressBox.style.display = 'block';
+
+            const text = document.getElementById('watermarkText').value;
+            const position = document.getElementById('watermarkPosition').value;
+            const opacity = document.getElementById('watermarkOpacity').value / 100;
+            const fontSize = parseInt(document.getElementById('watermarkSize').value);
+
+            for (let i = 0; i < selectedFiles.length; i++) {
+                const file = selectedFiles[i];
+                progressStatus.innerText = `正在處理 (${i + 1}/${selectedFiles.length}): ${file.name}`;
+                
+                try {
+                    await processVideo(file, text, position, opacity, fontSize, (progress) => {
+                        const percent = Math.round(progress * 100);
+                        progressBarFill.style.width = `${percent}%`;
+                        progressPercent.innerText = `${percent}%`;
+                    });
+                } catch (err) {
+                    console.log(err);
+                    alert(`處理 ${file.name} 時發生錯誤，可能檔案過大或格式不支援。`);
+                }
+            }
+
+            progressStatus.innerText = "全部影片處理完成！請至下載區檢查檔案。";
+            processBtn.disabled = false;
+        });
+
+        function processVideo(file, text, position, opacity, fontSize, onProgress) {
+            return new Promise((resolve, reject) => {
+                const video = document.createElement('video');
+                video.src = URL.createObjectURL(file);
+                video.crossOrigin = 'anonymous';
+                video.muted = true;
+                video.playsInline = true;
+
+                video.onloadedmetadata = async () => {
+                    const srcWidth = video.videoWidth;
+                    const srcHeight = video.videoHeight;
+
+                    // 目標 9:16 尺寸 (保持高畫質，以原影片高度為基準計算 9:16 寬度，或預設 4K 規格 2160x3840)
+                    let targetHeight = srcHeight;
+                    let targetWidth = Math.round(targetHeight * (9 / 16));
+                    if (targetWidth > srcWidth) {
+                        targetWidth = srcWidth;
+                        targetHeight = Math.round(targetWidth * (16 / 9));
+                    }
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = targetWidth;
+                    canvas.height = targetHeight;
+                    const ctx = canvas.getContext('2d');
+
+                    // 串接音訊軌道
+                    const stream = canvas.captureStream(60); // 支援 60fps
+                    let audioTrack = null;
+                    try {
+                        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                        const source = audioCtx.createMediaElementSource(video);
+                        const dest = audioCtx.createMediaStreamDestination();
+                        source.connect(dest);
+                        source.connect(audioCtx.destination);
+                        if (dest.stream.getAudioTracks().length > 0) {
+                            stream.addTrack(dest.stream.getAudioTracks()[0]);
+                        }
+                    } catch (e) { console.log("音訊擷取略過", e); }
+
+                    let mimeType = 'video/webm;codecs=vp9,opus';
+                    if (!MediaRecorder.isTypeSupported(mimeType)) {
+                        mimeType = 'video/webm';
+                    }
+                    if (!MediaRecorder.isTypeSupported(mimeType)) {
+                        mimeType = ''; // 讓瀏覽器自動挑選
+                    }
+
+                    const recorderOptions = mimeType ? { mimeType, videoBitsPerRate: 50000000 } : {};
+                    let mediaRecorder;
+                    try {
+                        mediaRecorder = new MediaRecorder(stream, recorderOptions);
+                    } catch (e) {
+                        mediaRecorder = new MediaRecorder(stream);
+                    }
+
+                    const chunks = [];
+                    mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+                    mediaRecorder.onstop = () => {
+                        const blob = new Blob(chunks, { type: 'video/mp4' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `watermarked_${file.name.replace(/\.[^/.]+$/, "")}.mp4`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        resolve();
+                    };
+
+                    mediaRecorder.start();
+                    video.play();
+
+                    const duration = video.duration;
+
+                    function drawFrame() {
+                        if (video.paused || video.ended) {
+                            if (video.ended) {
+                                mediaRecorder.stop();
+                            }
+                            return;
+                        }
+
+                        // 算 9:16 居中裁切位置
+                        const sAspect = srcWidth / srcHeight;
+                        const tAspect = 9 / 16;
+                        let sw = srcWidth, sh = srcHeight, sx = 0, sy = 0;
+
+                        if (sAspect > tAspect) {
+                            sw = srcHeight * tAspect;
+                            sx = (srcWidth - sw) / 2;
+                        } else {
+                            sh = srcWidth / tAspect;
+                            sy = (srcHeight - sh) / 2;
+                        }
+
+                        // 繪製影片畫面
+                        ctx.clearRect(0, 0, targetWidth, targetHeight);
+                        ctx.drawImage(video, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
+
+                        // 繪製浮水印文字
+                        ctx.save();
+                        ctx.globalAlpha = opacity;
+                        ctx.font = `${fontSize * (targetHeight / 1080)}px sans-serif`;
+                        ctx.fillStyle = '#ffffff';
+                        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+                        ctx.shadowBlur = 6;
+
+                        const padding = 30;
+                        let x = padding, y = targetHeight - padding;
+
+                        const metrics = ctx.measureText(text);
+                        const textWidth = metrics.width;
+                        const textHeight = fontSize;
+
+                        if (position === 'bottom-right') {
+                            x = targetWidth - textWidth - padding;
+                            y = targetHeight - padding;
+                        } else if (position === 'bottom-left') {
+                            x = padding;
+                            y = targetHeight - padding;
+                        } else if (position === 'top-right') {
+                            x = targetWidth - textWidth - padding;
+                            y = padding + textHeight;
+                        } else if (position === 'top-left') {
+                            x = padding;
+                            y = padding + textHeight;
+                        } else if (position === 'center') {
+                            x = (targetWidth - textWidth) / 2;
+                            y = targetHeight / 2;
+                        }
+
+                        ctx.fillText(text, x, y);
+                        ctx.restore();
+
+                        onProgress(video.currentTime / duration);
+                        requestAnimationFrame(drawFrame);
+                    }
+
+                    drawFrame();
+                };
+
+                video.onerror = (e) => reject(e);
+            });
+        }
+    </script>
+</body>
+</html>
