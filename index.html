@@ -27,33 +27,58 @@
         .btn { display: block; width: 100%; padding: 14px; background: var(--primary); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; text-align: center; }
         .btn:disabled { background: #3a3a4f; color: var(--text-secondary); cursor: not-allowed; }
         .file-list { font-size: 13px; color: var(--text-secondary); margin-top: 8px; max-height: 100px; overflow-y: auto; }
+        .preview-container { width: 100%; background: #000; border-radius: 10px; overflow: hidden; position: relative; aspect-ratio: 9/16; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); }
+        canvas#previewCanvas { width: 100%; height: 100%; object-fit: contain; }
+        .time-inputs { display: flex; gap: 10px; margin-bottom: 12px; }
+        .time-inputs div { flex: 1; }
+        input[type="number"] { width: 100%; padding: 8px; background: #12121a; border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; }
         .progress-box { margin-top: 12px; display: none; }
         .progress-bar-bg { width: 100%; height: 8px; background: #12121a; border-radius: 4px; overflow: hidden; margin-top: 6px; }
         .progress-bar-fill { width: 0%; height: 100%; background: var(--primary); transition: width 0.2s; }
         .status-text { font-size: 12px; color: var(--text-secondary); margin-top: 6px; text-align: right; }
+        .download-item { background: #12121a; padding: 10px 14px; border-radius: 8px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); }
+        .download-item span { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
+        .download-btn { background: #28a745; color: white; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 600; }
     </style>
 </head>
 <body>
 
     <h1>✨ 演唱會 4K 影片浮水印工具</h1>
-    <div class="subtitle">支援 iPhone / 三星 ｜ 零畫質損耗 ｜ 9:16 自動排版</div>
+    <div class="subtitle">支援 BOICE 專屬雙浮水印 ｜ 即時預覽 ｜ 獨立下載防呆</div>
 
-    <!-- 步驟 1：選擇影片 -->
+    <!-- 步驟 1：選擇影片與剪輯範圍 -->
     <div class="card">
-        <h2>📁 1. 選擇 4K 影片 (可多選)</h2>
+        <h2>📁 1. 選擇影片與設定範圍</h2>
         <label class="file-upload-btn" for="videoInput">點此從手機相簿選取影片</label>
         <input type="file" id="videoInput" accept="video/*" multiple style="display: none;">
         <div id="fileList" class="file-list">尚未選擇檔案</div>
+
+        <div id="clipSection" style="display: none; margin-top: 14px;">
+            <label>剪輯影片範圍 (秒數)</label>
+            <div class="time-inputs">
+                <div>
+                    <label style="font-size: 11px;">開始時間</label>
+                    <input type="number" id="startTime" value="0" min="0" step="0.1">
+                </div>
+                <div>
+                    <label style="font-size: 11px;">結束時間 (0代表結尾)</label>
+                    <input type="number" id="endTime" value="0" min="0" step="0.1">
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!-- 步驟 2：設定浮水印 -->
+    <!-- 步驟 2：浮水印即時預覽與設定 -->
     <div class="card">
-        <h2>✍️ 2. 浮水印設定</h2>
-        <label for="watermarkText">文字內容 (例如你的 IG / Twitter ID)</label>
-        <input type="text" id="watermarkText" value="@Joyce8651" placeholder="輸入浮水印文字">
+        <h2>👁️ 2. 浮水印即時預覽與設定</h2>
+        
+        <!-- 畫布即時預覽區 -->
+        <div class="preview-container">
+            <canvas id="previewCanvas"></canvas>
+        </div>
 
         <label for="watermarkPosition">位置</label>
-        <select id="watermarkPosition">
+        <select id="watermarkPosition" onchange="updatePreview()">
             <option value="bottom-right">右下角</option>
             <option value="bottom-left">左下角</option>
             <option value="top-right">右上角</option>
@@ -61,16 +86,16 @@
             <option value="center">置中 (半透明)</option>
         </select>
 
-        <label>透明度 (<span id="opacityVal">70</span>%)</label>
-        <input type="range" id="watermarkOpacity" min="10" max="100" value="70" oninput="document.getElementById('opacityVal').innerText=this.value">
+        <label>透明度 (<span id="opacityVal">80</span>%)</label>
+        <input type="range" id="watermarkOpacity" min="10" max="100" value="80" oninput="document.getElementById('opacityVal').innerText=this.value; updatePreview();">
 
-        <label>字體大小 (<span id="sizeVal">24</span>px)</label>
-        <input type="range" id="watermarkSize" min="14" max="60" value="24" oninput="document.getElementById('sizeVal').innerText=this.value">
+        <label>字體大小 (<span id="sizeVal">20</span>px)</label>
+        <input type="range" id="watermarkSize" min="12" max="50" value="20" oninput="document.getElementById('sizeVal').innerText=this.value; updatePreview();">
     </div>
 
-    <!-- 步驟 3：開始處理與下載 -->
+    <!-- 步驟 3：開始處理與防呆下載區 -->
     <div class="card">
-        <h2>🚀 3. 輸出 9:16 影片</h2>
+        <h2>🚀 3. 輸出與下載專區</h2>
         <button id="processBtn" class="btn" disabled>開始批次製作浮水印</button>
         
         <div id="progressBox" class="progress-box">
@@ -79,6 +104,10 @@
                 <div id="progressBarFill" class="progress-bar-fill"></div>
             </div>
             <div id="progressPercent" class="status-text">0%</div>
+        </div>
+
+        <div id="downloadContainer" style="margin-top: 14px;">
+            <!-- 獨立下載清單，處理好一支就馬上有下載按鈕，不怕跳掉！ -->
         </div>
     </div>
 
@@ -90,19 +119,112 @@
         const progressBarFill = document.getElementById('progressBarFill');
         const progressStatus = document.getElementById('progressStatus');
         const progressPercent = document.getElementById('progressPercent');
+        const downloadContainer = document.getElementById('downloadContainer');
+        const clipSection = document.getElementById('clipSection');
+        const startTimeInput = document.getElementById('startTime');
+        const endTimeInput = document.getElementById('endTime');
+        const previewCanvas = document.getElementById('previewCanvas');
+        const ctx = previewCanvas.getContext('2d');
 
         let selectedFiles = [];
+        let previewVideo = document.createElement('video');
+        previewVideo.muted = true;
+        previewVideo.playsInline = true;
 
         videoInput.addEventListener('change', (e) => {
             selectedFiles = Array.from(e.target.files);
             if (selectedFiles.length > 0) {
                 fileList.innerHTML = `已選擇 ${selectedFiles.length} 個檔案：<br>` + selectedFiles.map(f => `• ${f.name}`).join('<br>');
                 processBtn.disabled = false;
+                clipSection.style.display = 'block';
+
+                // 載入第一支影片作為預覽用
+                previewVideo.src = URL.createObjectURL(selectedFiles[0]);
+                previewVideo.onloadedmetadata = () => {
+                    previewCanvas.width = 1080;
+                    previewCanvas.height = 1920;
+                    endTimeInput.value = previewVideo.duration.toFixed(1);
+                    updatePreview();
+                };
             } else {
                 fileList.innerHTML = '尚未選擇檔案';
                 processBtn.disabled = true;
+                clipSection.style.display = 'none';
             }
         });
+
+        function updatePreview() {
+            if (!previewVideo.src) return;
+            const srcWidth = previewVideo.videoWidth || 1920;
+            const srcHeight = previewVideo.videoHeight || 1080;
+
+            let targetWidth = 1080;
+            let targetHeight = 1920;
+
+            // 算 9:16 居中裁切
+            const sAspect = srcWidth / srcHeight;
+            const tAspect = 9 / 16;
+            let sw = srcWidth, sh = srcHeight, sx = 0, sy = 0;
+
+            if (sAspect > tAspect) {
+                sw = srcHeight * tAspect;
+                sx = (srcWidth - sw) / 2;
+            } else {
+                sh = srcWidth / tAspect;
+                sy = (srcHeight - sh) / 2;
+            }
+
+            ctx.clearRect(0, 0, targetWidth, targetHeight);
+            
+            // 繪製模擬背景或預覽畫面
+            ctx.fillStyle = '#12121a';
+            ctx.fillRect(0, 0, targetWidth, targetHeight);
+
+            const position = document.getElementById('watermarkPosition').value;
+            const opacity = document.getElementById('watermarkOpacity').value / 100;
+            const fontSize = parseInt(document.getElementById('watermarkSize').value);
+
+            // 雙浮水印內容：boice114forever 與 joyce8651
+            const texts = ["boice114forever", "joyce8651"];
+
+            ctx.save();
+            ctx.globalAlpha = opacity;
+            ctx.font = `${fontSize * (targetHeight / 1080)}px sans-serif`;
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+            ctx.shadowBlur = 6;
+
+            const padding = 30;
+            let currentYOffset = 0;
+
+            texts.forEach((text, index) => {
+                const metrics = ctx.measureText(text);
+                const textWidth = metrics.width;
+                const textHeight = fontSize;
+                let x = padding, y = targetHeight - padding;
+
+                if (position === 'bottom-right') {
+                    x = targetWidth - textWidth - padding;
+                    y = targetHeight - padding - (texts.length - 1 - index) * (fontSize + 8);
+                } else if (position === 'bottom-left') {
+                    x = padding;
+                    y = targetHeight - padding - (texts.length - 1 - index) * (fontSize + 8);
+                } else if (position === 'top-right') {
+                    x = targetWidth - textWidth - padding;
+                    y = padding + textHeight + (index * (fontSize + 8));
+                } else if (position === 'top-left') {
+                    x = padding;
+                    y = padding + textHeight + (index * (fontSize + 8));
+                } else if (position === 'center') {
+                    x = (targetWidth - textWidth) / 2;
+                    y = (targetHeight / 2) + (index * (fontSize + 10)) - 15;
+                }
+
+                ctx.fillText(text, x, y);
+            });
+
+            ctx.restore();
+        }
 
         processBtn.addEventListener('click', async () => {
             if (selectedFiles.length === 0) return;
@@ -110,32 +232,39 @@
             processBtn.disabled = true;
             progressBox.style.display = 'block';
 
-            const text = document.getElementById('watermarkText').value;
             const position = document.getElementById('watermarkPosition').value;
             const opacity = document.getElementById('watermarkOpacity').value / 100;
             const fontSize = parseInt(document.getElementById('watermarkSize').value);
+            const startTime = parseFloat(startTimeInput.value) || 0;
+            const endTimeCustom = parseFloat(endTimeInput.value) || 0;
 
             for (let i = 0; i < selectedFiles.length; i++) {
                 const file = selectedFiles[i];
                 progressStatus.innerText = `正在處理 (${i + 1}/${selectedFiles.length}): ${file.name}`;
                 
                 try {
-                    await processVideo(file, text, position, opacity, fontSize, (progress) => {
+                    await processVideo(file, position, opacity, fontSize, startTime, endTimeCustom, (progress) => {
                         const percent = Math.round(progress * 100);
                         progressBarFill.style.width = `${percent}%`;
                         progressPercent.innerText = `${percent}%`;
+                    }, (downloadUrl, fileName) => {
+                        // 防呆機制：每完成一支影片，立刻產生一個獨立下載區塊！
+                        const item = document.createElement('div');
+                        item.className = 'download-item';
+                        item.innerHTML = `<span>✅ ${fileName}</span><a class="download-btn" href="${downloadUrl}" download="${fileName}">立即下載</a>`;
+                        downloadContainer.appendChild(item);
                     });
                 } catch (err) {
                     console.log(err);
-                    alert(`處理 ${file.name} 時發生錯誤，可能檔案過大或格式不支援。`);
+                    alert(`處理 ${file.name} 時發生錯誤。`);
                 }
             }
 
-            progressStatus.innerText = "全部影片處理完成！請至下載區檢查檔案。";
+            progressStatus.innerText = "全部影片處理完成！";
             processBtn.disabled = false;
         });
 
-        function processVideo(file, text, position, opacity, fontSize, onProgress) {
+        function processVideo(file, position, opacity, fontSize, startTime, endTimeCustom, onProgress, onComplete) {
             return new Promise((resolve, reject) => {
                 const video = document.createElement('video');
                 video.src = URL.createObjectURL(file);
@@ -143,26 +272,21 @@
                 video.muted = true;
                 video.playsInline = true;
 
-                video.onloadedmetadata = async () => {
+                video.onloadedmetadata = () => {
                     const srcWidth = video.videoWidth;
                     const srcHeight = video.videoHeight;
+                    const duration = video.duration;
+                    const endTime = (endTimeCustom > 0 && endTimeCustom < duration) ? endTimeCustom : duration;
 
-                    // 目標 9:16 尺寸 (保持高畫質，以原影片高度為基準計算 9:16 寬度，或預設 4K 規格 2160x3840)
-                    let targetHeight = srcHeight;
-                    let targetWidth = Math.round(targetHeight * (9 / 16));
-                    if (targetWidth > srcWidth) {
-                        targetWidth = srcWidth;
-                        targetHeight = Math.round(targetWidth * (16 / 9));
-                    }
+                    let targetHeight = 1920;
+                    let targetWidth = 1080;
 
                     const canvas = document.createElement('canvas');
                     canvas.width = targetWidth;
                     canvas.height = targetHeight;
                     const ctx = canvas.getContext('2d');
 
-                    // 串接音訊軌道
-                    const stream = canvas.captureStream(60); // 支援 60fps
-                    let audioTrack = null;
+                    const stream = canvas.captureStream(60);
                     try {
                         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                         const source = audioCtx.createMediaElementSource(video);
@@ -175,105 +299,94 @@
                     } catch (e) { console.log("音訊擷取略過", e); }
 
                     let mimeType = 'video/webm;codecs=vp9,opus';
-                    if (!MediaRecorder.isTypeSupported(mimeType)) {
-                        mimeType = 'video/webm';
-                    }
-                    if (!MediaRecorder.isTypeSupported(mimeType)) {
-                        mimeType = ''; // 讓瀏覽器自動挑選
-                    }
+                    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm';
+                    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = '';
 
-                    const recorderOptions = mimeType ? { mimeType, videoBitsPerRate: 50000000 } : {};
-                    let mediaRecorder;
-                    try {
-                        mediaRecorder = new MediaRecorder(stream, recorderOptions);
-                    } catch (e) {
-                        mediaRecorder = new MediaRecorder(stream);
-                    }
-
+                    const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
                     const chunks = [];
+                    
                     mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
                     mediaRecorder.onstop = () => {
                         const blob = new Blob(chunks, { type: 'video/mp4' });
                         const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `watermarked_${file.name.replace(/\.[^/.]+$/, "")}.mp4`;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
+                        const outName = `watermarked_${file.name.replace(/\.[^/.]+$/, "")}.mp4`;
+                        onComplete(url, outName);
                         resolve();
                     };
 
-                    mediaRecorder.start();
-                    video.play();
+                    video.currentTime = startTime;
+                    video.onseeked = () => {
+                        mediaRecorder.start();
+                        video.play();
 
-                    const duration = video.duration;
-
-                    function drawFrame() {
-                        if (video.paused || video.ended) {
-                            if (video.ended) {
-                                mediaRecorder.stop();
+                        function drawFrame() {
+                            if (video.paused || video.ended || video.currentTime >= endTime) {
+                                video.pause();
+                                if (mediaRecorder.state !== 'inactive') {
+                                    mediaRecorder.stop();
+                                }
+                                return;
                             }
-                            return;
+
+                            const sAspect = srcWidth / srcHeight;
+                            const tAspect = 9 / 16;
+                            let sw = srcWidth, sh = srcHeight, sx = 0, sy = 0;
+
+                            if (sAspect > tAspect) {
+                                sw = srcHeight * tAspect;
+                                sx = (srcWidth - sw) / 2;
+                            } else {
+                                sh = srcWidth / tAspect;
+                                sy = (srcHeight - sh) / 2;
+                            }
+
+                            ctx.clearRect(0, 0, targetWidth, targetHeight);
+                            ctx.drawImage(video, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
+
+                            // 繪製雙浮水印 (boice114forever 與 joyce8651)
+                            const texts = ["boice114forever", "joyce8651"];
+                            ctx.save();
+                            ctx.globalAlpha = opacity;
+                            ctx.font = `${fontSize * (targetHeight / 1080)}px sans-serif`;
+                            ctx.fillStyle = '#ffffff';
+                            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+                            ctx.shadowBlur = 6;
+
+                            const padding = 30;
+                            texts.forEach((text, index) => {
+                                const metrics = ctx.measureText(text);
+                                const textWidth = metrics.width;
+                                const textHeight = fontSize;
+                                let x = padding, y = targetHeight - padding;
+
+                                if (position === 'bottom-right') {
+                                    x = targetWidth - textWidth - padding;
+                                    y = targetHeight - padding - (texts.length - 1 - index) * (fontSize + 8);
+                                } else if (position === 'bottom-left') {
+                                    x = padding;
+                                    y = targetHeight - padding - (texts.length - 1 - index) * (fontSize + 8);
+                                } else if (position === 'top-right') {
+                                    x = targetWidth - textWidth - padding;
+                                    y = padding + textHeight + (index * (fontSize + 8));
+                                } else if (position === 'top-left') {
+                                    x = padding;
+                                    y = padding + textHeight + (index * (fontSize + 8));
+                                } else if (position === 'center') {
+                                    x = (targetWidth - textWidth) / 2;
+                                    y = (targetHeight / 2) + (index * (fontSize + 10)) - 15;
+                                }
+
+                                ctx.fillText(text, x, y);
+                            });
+                            ctx.restore();
+
+                            const progress = (video.currentTime - startTime) / (endTime - startTime);
+                            onProgress(Math.min(Math.max(progress, 0), 1));
+                            requestAnimationFrame(drawFrame);
                         }
 
-                        // 算 9:16 居中裁切位置
-                        const sAspect = srcWidth / srcHeight;
-                        const tAspect = 9 / 16;
-                        let sw = srcWidth, sh = srcHeight, sx = 0, sy = 0;
-
-                        if (sAspect > tAspect) {
-                            sw = srcHeight * tAspect;
-                            sx = (srcWidth - sw) / 2;
-                        } else {
-                            sh = srcWidth / tAspect;
-                            sy = (srcHeight - sh) / 2;
-                        }
-
-                        // 繪製影片畫面
-                        ctx.clearRect(0, 0, targetWidth, targetHeight);
-                        ctx.drawImage(video, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
-
-                        // 繪製浮水印文字
-                        ctx.save();
-                        ctx.globalAlpha = opacity;
-                        ctx.font = `${fontSize * (targetHeight / 1080)}px sans-serif`;
-                        ctx.fillStyle = '#ffffff';
-                        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-                        ctx.shadowBlur = 6;
-
-                        const padding = 30;
-                        let x = padding, y = targetHeight - padding;
-
-                        const metrics = ctx.measureText(text);
-                        const textWidth = metrics.width;
-                        const textHeight = fontSize;
-
-                        if (position === 'bottom-right') {
-                            x = targetWidth - textWidth - padding;
-                            y = targetHeight - padding;
-                        } else if (position === 'bottom-left') {
-                            x = padding;
-                            y = targetHeight - padding;
-                        } else if (position === 'top-right') {
-                            x = targetWidth - textWidth - padding;
-                            y = padding + textHeight;
-                        } else if (position === 'top-left') {
-                            x = padding;
-                            y = padding + textHeight;
-                        } else if (position === 'center') {
-                            x = (targetWidth - textWidth) / 2;
-                            y = targetHeight / 2;
-                        }
-
-                        ctx.fillText(text, x, y);
-                        ctx.restore();
-
-                        onProgress(video.currentTime / duration);
-                        requestAnimationFrame(drawFrame);
-                    }
-
-                    drawFrame();
+                        drawFrame();
+                    };
                 };
 
                 video.onerror = (e) => reject(e);
