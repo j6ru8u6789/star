@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>4K 60fps 演唱會影片剪輯與浮水印工具</title>
+    <title>4K 60fps 演唱會 HEVC 影片剪輯工具</title>
     <style>
         :root {
             --primary: #ff2d55;
@@ -13,6 +13,7 @@
             --text-secondary: #a0a0b0;
             --border: #2c2c3e;
             --accent-yellow: #ffcc00;
+            --guide-line: #00f0ff;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; touch-action: manipulation; }
         body { background: var(--bg); color: var(--text); padding: 16px; max-width: 600px; margin: 0 auto; user-select: none; -webkit-user-select: none; }
@@ -27,23 +28,25 @@
         .btn { display: block; width: 100%; padding: 14px; background: var(--primary); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; text-align: center; }
         .btn:disabled { background: #3a3a4f; color: var(--text-secondary); cursor: not-allowed; }
         
-        /* 獨立影片設定卡片 */
         .video-item-card { background: #12121a; border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 16px; }
         .video-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 10px; word-break: break-all; }
         
-        /* 9:16 預覽區域 & 拖曳控制 */
+        /* 9:16 預覽區域 */
         .preview-wrapper { position: relative; width: 100%; aspect-ratio: 9/16; background: #000; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); margin-bottom: 10px; touch-action: none; }
         .preview-canvas { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
-        .drag-hint { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); color: #fff; padding: 4px 10px; border-radius: 12px; font-size: 11px; pointer-events: none; opacity: 0.8; }
+        .drag-hint { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); color: #fff; padding: 4px 10px; border-radius: 12px; font-size: 11px; pointer-events: none; opacity: 0.8; z-index: 5; }
         
-        /* iOS 風格影片剪輯列 (Filmstrip / Trimmer) */
+        /* iOS 風格時間軸 & 縮圖膠卷 */
         .ios-trimmer-container { background: #1a1a24; padding: 12px 10px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 12px; }
-        .trimmer-track { position: relative; height: 44px; background: #2a2a3a; border-radius: 6px; overflow: hidden; display: flex; align-items: center; }
-        .trimmer-filmstrip { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; opacity: 0.4; }
-        .trimmer-filmstrip div { flex: 1; height: 100%; border-right: 1px solid #1a1a24; background: #333; }
+        .trimmer-track { position: relative; height: 50px; background: #2a2a3a; border-radius: 6px; overflow: hidden; display: flex; align-items: center; }
+        .filmstrip-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; opacity: 0.7; pointer-events: none; }
+        .filmstrip-thumb { flex: 1; height: 100%; object-fit: cover; border-right: 1px solid rgba(0,0,0,0.3); }
         
-        /* iOS 剪輯選取框 */
-        .trim-selection { position: absolute; top: 0; height: 100%; background: rgba(255, 204, 0, 0.2); border-top: 3px solid var(--accent-yellow); border-bottom: 3px solid var(--accent-yellow); box-sizing: border-border-box; }
+        /* 播放進度指標 (Playhead) */
+        .playhead-marker { position: absolute; top: 0; width: 3px; height: 100%; background: #ffffff; box-shadow: 0 0 4px rgba(0,0,0,0.8); pointer-events: none; z-index: 8; transform: translateX(-50%); }
+        .playhead-marker::before { content: ""; position: absolute; top: -2px; left: 50%; transform: translateX(-50%); border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #fff; }
+
+        .trim-selection { position: absolute; top: 0; height: 100%; background: rgba(255, 204, 0, 0.25); border-top: 3px solid var(--accent-yellow); border-bottom: 3px solid var(--accent-yellow); box-sizing: border-box; }
         .handle { position: absolute; top: 0; width: 16px; height: 100%; background: var(--accent-yellow); display: flex; align-items: center; justify-content: center; cursor: ew-resize; touch-action: none; z-index: 10; border-radius: 2px; }
         .handle::after { content: "||"; font-size: 10px; color: #000; font-weight: bold; }
         .handle-left { left: 0; border-top-left-radius: 6px; border-bottom-left-radius: 6px; }
@@ -52,6 +55,7 @@
         .trim-info { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); margin-top: 6px; }
         .play-control-bar { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
         .play-btn { background: #2c2c3e; color: #fff; border: none; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+        .sound-btn { background: #2c2c3e; color: #fff; border: none; padding: 8px 10px; border-radius: 8px; font-size: 12px; cursor: pointer; }
         
         .progress-box { margin-top: 12px; display: none; }
         .progress-bar-bg { width: 100%; height: 8px; background: #12121a; border-radius: 4px; overflow: hidden; margin-top: 6px; }
@@ -64,10 +68,10 @@
 </head>
 <body>
 
-    <h1>✨ 演唱會 4K 影片剪輯工具</h1>
-    <div class="subtitle">iOS 剪輯手感 ｜ 任意手指拖曳浮水印 ｜ 座標位置自動記憶</div>
+    <h1>✨ 演唱會 4K HEVC 影片工具</h1>
+    <div class="subtitle">HEVC(H.265) 輸出 ｜ 音訊預覽 ｜ 縮圖膠卷與 IG 磁吸對齊線</div>
 
-    <!-- 步驟 1：選擇多個影片 -->
+    <!-- 步驟 1：選擇影片 -->
     <div class="card">
         <h2>📁 1. 選擇 4K 影片 (可多選)</h2>
         <label class="file-upload-btn" for="videoInput">點此從手機相簿選取影片</label>
@@ -75,9 +79,9 @@
         <div id="fileSummary" style="font-size: 13px; color: var(--text-secondary);">尚未選擇檔案</div>
     </div>
 
-    <!-- 全局樣式設定 (自動記憶) -->
+    <!-- 全局樣式設定 -->
     <div class="card">
-        <h2>⚙️ 浮水印樣式微調 (自動記憶)</h2>
+        <h2>⚙️ 浮水印樣式設定 (自動記憶)</h2>
         <label>透明度 (<span id="opacityVal">80</span>%)</label>
         <input type="range" id="globalOpacity" min="10" max="100" value="80" oninput="document.getElementById('opacityVal').innerText=this.value; saveSettings(); updateAllPreviews();">
 
@@ -85,16 +89,16 @@
         <input type="range" id="globalSize" min="12" max="60" value="24" oninput="document.getElementById('sizeVal').innerText=this.value; saveSettings(); updateAllPreviews();">
     </div>
 
-    <!-- 步驟 2：各別影片 iOS 風格剪輯區 -->
+    <!-- 步驟 2：影片編輯卡片 -->
     <div class="card" id="videoCardsContainer" style="display: none;">
-        <h2>✂️ 2. iOS 風格剪輯與浮水印拖曳</h2>
+        <h2>✂️ 2. 縮圖膠卷剪輯與 IG 磁吸浮水印</h2>
         <div id="cardsList"></div>
     </div>
 
     <!-- 步驟 3：開始輸出 -->
     <div class="card">
-        <h2>🚀 3. 匯出與下載專區</h2>
-        <button id="processBtn" class="btn" disabled>開始逐一製作浮水印</button>
+        <h2>🚀 3. HEVC 高畫質輸出與下載</h2>
+        <button id="processBtn" class="btn" disabled>開始製作 HEVC 影片</button>
         
         <div id="progressBox" class="progress-box">
             <div id="progressStatus" style="font-size: 13px;">準備處理...</div>
@@ -120,9 +124,9 @@
         const downloadContainer = document.getElementById('downloadContainer');
 
         let videoProjects = [];
-
-        // 浮水印位置紀錄 (預設靠右下角，座標以 0.0~1.0 比率儲存)
-        let watermarkNormalizedPos = { x: 0.85, y: 0.92 };
+        let watermarkNormalizedPos = { x: 0.5, y: 0.88 }; // 預設下方居中
+        let isDraggingWM = false;
+        let activeSnapLines = { xCenter: false, yCenter: false };
 
         window.addEventListener('DOMContentLoaded', () => {
             const savedOpacity = localStorage.getItem('wm_opacity');
@@ -172,35 +176,35 @@
                     endTime: 0,
                     duration: 0,
                     isPlaying: false,
+                    isMuted: false,
                     animFrame: null
                 };
 
                 project.videoEl.src = URL.createObjectURL(file);
-                project.videoEl.muted = true;
+                project.videoEl.muted = false; // 預設開啟音訊能力
                 project.videoEl.playsInline = true;
                 project.videoEl.preload = 'auto';
 
-                // 建立卡片 UI
                 const cardDiv = document.createElement('div');
                 cardDiv.className = 'video-item-card';
                 cardDiv.innerHTML = `
                     <div class="video-title">🎥 ${file.name}</div>
                     
                     <div class="preview-wrapper" id="wrapper_${index}">
-                        <div class="drag-hint">🖐️ 用手指直接拖曳浮水印調整位置</div>
+                        <div class="drag-hint">🖐️ 拖曳浮水印（接近中心自動貼齊對齊線）</div>
                         <canvas class="preview-canvas" id="canvas_${index}"></canvas>
                     </div>
 
-                    <label>此影片浮水印內容</label>
+                    <label>浮水印文字內容</label>
                     <select id="preset_${index}">
                         <option value="boice114forever">boice114forever</option>
                         <option value="joyce8651">joyce8651</option>
                     </select>
 
-                    <!-- iOS 風格編輯列 -->
                     <div class="ios-trimmer-container">
                         <div class="trimmer-track" id="track_${index}">
-                            <div class="trimmer-filmstrip"><div></div><div></div><div></div><div></div><div></div></div>
+                            <div class="filmstrip-container" id="filmstrip_${index}"></div>
+                            <div class="playhead-marker" id="playhead_${index}" style="left: 0%;"></div>
                             <div class="trim-selection" id="selection_${index}">
                                 <div class="handle handle-left" id="h_left_${index}"></div>
                                 <div class="handle handle-right" id="h_right_${index}"></div>
@@ -212,8 +216,8 @@
                             <span id="time_end_${index}">0.0s</span>
                         </div>
                         <div class="play-control-bar">
-                            <button class="play-btn" id="play_btn_${index}">▶️ 預覽片段</button>
-                            <span style="font-size: 11px; color: var(--text-secondary);" id="play_status_${index}">已尋焦至起點</span>
+                            <button class="play-btn" id="play_btn_${index}">▶️ 預覽播放 (聲音開啟)</button>
+                            <button class="sound-btn" id="sound_btn_${index}">🔊 聲音: 開</button>
                         </div>
                     </div>
                 `;
@@ -223,31 +227,34 @@
                 project.canvas = cardDiv.querySelector(`#canvas_${index}`);
                 project.ctx = project.canvas.getContext('2d');
 
-                // 綁定手指手勢拖曳浮水印 (Touch / Mouse)
-                setupDragWatermark(project);
+                setupDragWatermarkWithSnapping(project);
 
-                // 影片加載並初始化 iOS Trimmer
                 project.videoEl.onloadedmetadata = () => {
                     project.duration = project.videoEl.duration;
                     project.endTime = project.duration;
                     project.canvas.width = 1080;
                     project.canvas.height = 1920;
 
+                    generateFilmstrip(project, cardDiv.querySelector(`#filmstrip_${index}`));
                     setupIOSTrimmer(project, cardDiv);
 
-                    // 確保 iOS / Android 上影片預覽能順利渲染出來
                     project.videoEl.currentTime = 0.05;
                 };
 
-                project.videoEl.onseeked = () => {
-                    drawProjectPreview(project);
-                };
+                project.videoEl.onseeked = () => drawProjectPreview(project);
 
                 cardDiv.querySelector(`#preset_${index}`).onchange = () => drawProjectPreview(project);
 
-                // 播放控制
+                // 音量與播放控制
                 const playBtn = cardDiv.querySelector(`#play_btn_${index}`);
+                const soundBtn = cardDiv.querySelector(`#sound_btn_${index}`);
+
                 playBtn.onclick = () => togglePlayProject(project, cardDiv);
+                soundBtn.onclick = () => {
+                    project.isMuted = !project.isMuted;
+                    project.videoEl.muted = project.isMuted;
+                    soundBtn.innerText = project.isMuted ? '🔇 聲音: 靜音' : '🔊 聲音: 開';
+                };
 
                 videoProjects.push(project);
             });
@@ -255,25 +262,66 @@
             processBtn.disabled = false;
         });
 
-        // 手指任意拖曳浮水印邏輯
-        function setupDragWatermark(project) {
-            let isDragging = false;
+        // 生成縮圖膠卷 (Filmstrip Thumbnails)
+        function generateFilmstrip(project, containerEl) {
+            const count = 6;
+            containerEl.innerHTML = '';
+            const tempVid = document.createElement('video');
+            tempVid.src = project.videoEl.src;
+            tempVid.muted = true;
+            tempVid.playsInline = true;
 
+            tempVid.onloadeddata = async () => {
+                const interval = project.duration / count;
+                for (let i = 0; i < count; i++) {
+                    tempVid.currentTime = i * interval + 0.1;
+                    await new Promise(r => tempVid.onseeked = r);
+                    
+                    const cvs = document.createElement('canvas');
+                    cvs.width = 100;
+                    cvs.height = 100;
+                    const c = cvs.getContext('2d');
+                    c.drawImage(tempVid, 0, 0, 100, 100);
+                    
+                    const img = document.createElement('img');
+                    img.className = 'filmstrip-thumb';
+                    img.src = cvs.toDataURL('image/jpeg', 0.5);
+                    containerEl.appendChild(img);
+                }
+            };
+        }
+
+        // 手指拖曳與 IG 磁吸輔助線 (Snap Lines)
+        function setupDragWatermarkWithSnapping(project) {
             const handleMove = (clientX, clientY) => {
-                if (!isDragging) return;
+                if (!isDraggingWM) return;
                 const rect = project.wrapper.getBoundingClientRect();
-                let x = (clientX - rect.left) / rect.width;
-                let y = (clientY - rect.top) / rect.height;
+                let rawX = (clientX - rect.left) / rect.width;
+                let rawY = (clientY - rect.top) / rect.height;
 
-                watermarkNormalizedPos.x = Math.max(0.05, Math.min(0.95, x));
-                watermarkNormalizedPos.y = Math.max(0.05, Math.min(0.95, y));
+                // IG 磁吸邏輯 (吸附中心 0.5)
+                const snapThreshold = 0.03;
+                activeSnapLines.xCenter = false;
+                activeSnapLines.yCenter = false;
+
+                if (Math.abs(rawX - 0.5) < snapThreshold) {
+                    rawX = 0.5;
+                    activeSnapLines.xCenter = true;
+                }
+                if (Math.abs(rawY - 0.5) < snapThreshold) {
+                    rawY = 0.5;
+                    activeSnapLines.yCenter = true;
+                }
+
+                watermarkNormalizedPos.x = Math.max(0.05, Math.min(0.95, rawX));
+                watermarkNormalizedPos.y = Math.max(0.05, Math.min(0.95, rawY));
 
                 saveSettings();
                 updateAllPreviews();
             };
 
             project.wrapper.addEventListener('touchstart', (e) => {
-                isDragging = true;
+                isDraggingWM = true;
                 handleMove(e.touches[0].clientX, e.touches[0].clientY);
             }, { passive: true });
 
@@ -281,26 +329,35 @@
                 handleMove(e.touches[0].clientX, e.touches[0].clientY);
             }, { passive: true });
 
-            window.addEventListener('touchend', () => isDragging = false);
+            window.addEventListener('touchend', () => {
+                isDraggingWM = false;
+                activeSnapLines = { xCenter: false, yCenter: false };
+                updateAllPreviews();
+            });
 
             project.wrapper.addEventListener('mousedown', (e) => {
-                isDragging = true;
+                isDraggingWM = true;
                 handleMove(e.clientX, e.clientY);
             });
 
             window.addEventListener('mousemove', (e) => {
-                if (isDragging) handleMove(e.clientX, e.clientY);
+                if (isDraggingWM) handleMove(e.clientX, e.clientY);
             });
 
-            window.addEventListener('mouseup', () => isDragging = false);
+            window.addEventListener('mouseup', () => {
+                isDraggingWM = false;
+                activeSnapLines = { xCenter: false, yCenter: false };
+                updateAllPreviews();
+            });
         }
 
-        // iOS 風格選取框拖動邏輯
+        // iOS Trimmer & 播放浮標
         function setupIOSTrimmer(project, cardDiv) {
             const track = cardDiv.querySelector(`#track_${project.id}`);
             const selection = cardDiv.querySelector(`#selection_${project.id}`);
             const hLeft = cardDiv.querySelector(`#h_left_${project.id}`);
             const hRight = cardDiv.querySelector(`#h_right_${project.id}`);
+            const playhead = cardDiv.querySelector(`#playhead_${project.id}`);
 
             const tStart = cardDiv.querySelector(`#time_start_${project.id}`);
             const tEnd = cardDiv.querySelector(`#time_end_${project.id}`);
@@ -320,9 +377,17 @@
                 tStart.innerText = project.startTime.toFixed(1) + 's';
                 tEnd.innerText = project.endTime.toFixed(1) + 's';
                 tDur.innerText = '長度: ' + (project.endTime - project.startTime).toFixed(1) + 's';
+
+                const curPercent = (project.videoEl.currentTime / project.duration) * 100;
+                playhead.style.left = curPercent + '%';
             };
 
             updateUI();
+
+            project.videoEl.addEventListener('timeupdate', () => {
+                const curPercent = (project.videoEl.currentTime / project.duration) * 100;
+                playhead.style.left = curPercent + '%';
+            });
 
             let activeHandle = null;
 
@@ -338,7 +403,7 @@
                 let offsetX = clientX - rect.left;
                 offsetX = Math.max(0, Math.min(rect.width, offsetX));
 
-                const minPx = 15; // 最小保留寬度
+                const minPx = 15;
 
                 if (activeHandle === 'left') {
                     if (offsetX < rightPx - minPx) leftPx = offsetX;
@@ -372,13 +437,11 @@
 
         function togglePlayProject(project, cardDiv) {
             const playBtn = cardDiv.querySelector(`#play_btn_${project.id}`);
-            const statusText = cardDiv.querySelector(`#play_status_${project.id}`);
 
             if (project.isPlaying) {
                 project.videoEl.pause();
                 project.isPlaying = false;
-                playBtn.innerText = '▶️ 預覽片段';
-                statusText.innerText = '已暫停';
+                playBtn.innerText = '▶️ 預覽播放 (聲音開啟)';
                 if (project.animFrame) cancelAnimationFrame(project.animFrame);
             } else {
                 if (project.videoEl.currentTime < project.startTime || project.videoEl.currentTime >= project.endTime) {
@@ -387,15 +450,13 @@
                 project.videoEl.play();
                 project.isPlaying = true;
                 playBtn.innerText = '⏸️ 暫停預覽';
-                statusText.innerText = '播放中...';
 
                 const loop = () => {
                     if (!project.isPlaying) return;
                     if (project.videoEl.currentTime >= project.endTime) {
                         project.videoEl.pause();
                         project.isPlaying = false;
-                        playBtn.innerText = '▶️ 預覽片段';
-                        statusText.innerText = '重頭播放完畢';
+                        playBtn.innerText = '▶️ 預覽播放 (聲音開啟)';
                         project.videoEl.currentTime = project.startTime;
                         return;
                     }
@@ -406,6 +467,7 @@
             }
         }
 
+        // 畫布預覽（包含 IG 風格對齊線）
         function drawProjectPreview(project) {
             const targetWidth = 1080;
             const targetHeight = 1920;
@@ -432,7 +494,42 @@
                 ctx.drawImage(project.videoEl, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
             }
 
-            // 繪製拖曳座標的浮水印
+            // 拖曳時顯示 IG 風格輔助線與磁吸線
+            if (isDraggingWM) {
+                ctx.strokeStyle = '#00f0ff';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([8, 8]);
+
+                // 垂直中心線
+                if (activeSnapLines.xCenter) {
+                    ctx.strokeStyle = '#ff2d55';
+                    ctx.lineWidth = 4;
+                    ctx.setLineDash([]);
+                } else {
+                    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+                }
+                ctx.beginPath();
+                ctx.moveTo(targetWidth / 2, 0);
+                ctx.lineTo(targetWidth / 2, targetHeight);
+                ctx.stroke();
+
+                // 水平中心線
+                if (activeSnapLines.yCenter) {
+                    ctx.strokeStyle = '#ff2d55';
+                    ctx.lineWidth = 4;
+                    ctx.setLineDash([]);
+                } else {
+                    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+                }
+                ctx.beginPath();
+                ctx.moveTo(0, targetHeight / 2);
+                ctx.lineTo(targetWidth, targetHeight / 2);
+                ctx.stroke();
+
+                ctx.setLineDash([]);
+            }
+
+            // 繪製浮水印
             const cardDiv = cardsList.children[project.id];
             if (!cardDiv) return;
             const text = cardDiv.querySelector(`#preset_${project.id}`).value;
@@ -449,11 +546,9 @@
             const metrics = ctx.measureText(text);
             const textWidth = metrics.width;
 
-            // 根據手指拖曳的比率計算 Canvas 實際座標
             let posX = targetWidth * watermarkNormalizedPos.x - (textWidth / 2);
             let posY = targetHeight * watermarkNormalizedPos.y;
 
-            // 邊界保護
             posX = Math.max(20, Math.min(targetWidth - textWidth - 20, posX));
             posY = Math.max(60, Math.min(targetHeight - 30, posY));
 
@@ -463,6 +558,21 @@
 
         function updateAllPreviews() {
             videoProjects.forEach(p => drawProjectPreview(p));
+        }
+
+        // 優先嘗試 HEVC (H.265) 編碼器輸出
+        function getSupportedHEVCBitrate() {
+            const types = [
+                'video/mp4;codecs=hevc,mp4a.40.2',
+                'video/mp4;codecs=h265,mp4a.40.2',
+                'video/webm;codecs=vp9,opus',
+                'video/mp4',
+                'video/webm'
+            ];
+            for (let t of types) {
+                if (MediaRecorder.isTypeSupported(t)) return t;
+            }
+            return '';
         }
 
         processBtn.addEventListener('click', async () => {
@@ -479,7 +589,7 @@
                 const cardDiv = cardsList.children[p.id];
                 const text = cardDiv.querySelector(`#preset_${p.id}`).value;
 
-                progressStatus.innerText = `正在處理 (${i + 1}/${videoProjects.length}): ${p.file.name}`;
+                progressStatus.innerText = `正在輸出 HEVC (${i + 1}/${videoProjects.length}): ${p.file.name}`;
 
                 try {
                     await processSingleVideo(p, text, opacity, fontSize, (progress) => {
@@ -489,7 +599,7 @@
                     }, (url, name) => {
                         const item = document.createElement('div');
                         item.className = 'download-item';
-                        item.innerHTML = `<span>✅ ${name}</span><a class="download-btn" href="${url}" download="${name}">立即下載</a>`;
+                        item.innerHTML = `<span>✅ ${name} (HEVC)</span><a class="download-btn" href="${url}" download="${name}">立即下載</a>`;
                         downloadContainer.appendChild(item);
                     });
                 } catch (err) {
@@ -498,7 +608,7 @@
                 }
             }
 
-            progressStatus.innerText = "全部影片處理完成！";
+            progressStatus.innerText = "全部 HEVC 影片處理完成！";
             processBtn.disabled = false;
         });
 
@@ -527,18 +637,15 @@
                     }
                 } catch (e) { console.log("音訊擷取略過", e); }
 
-                let mimeType = 'video/webm;codecs=vp9,opus';
-                if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm';
-                if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = '';
-
-                const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+                const mimeType = getSupportedHEVCBitrate();
+                const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType, videoBitsPerSecond: 45000000 } : {});
                 const chunks = [];
 
                 mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
                 mediaRecorder.onstop = () => {
                     const blob = new Blob(chunks, { type: 'video/mp4' });
                     const url = URL.createObjectURL(blob);
-                    const outName = `watermarked_${p.file.name.replace(/\.[^/.]+$/, "")}.mp4`;
+                    const outName = `HEVC_watermarked_${p.file.name.replace(/\.[^/.]+$/, "")}.mp4`;
                     onComplete(url, outName);
                     resolve();
                 };
