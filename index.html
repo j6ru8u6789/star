@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>4K 60fps 演唱會影片批次浮水印工具</title>
+    <title>4K 60fps 演唱會影片獨立批次工具</title>
     <style>
         :root {
             --primary: #ff2d55;
@@ -22,21 +22,19 @@
         label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
         input[type="text"], select { width: 100%; padding: 10px; background: #12121a; border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; margin-bottom: 12px; }
         input[type="range"] { width: 100%; accent-color: var(--primary); margin-bottom: 6px; }
-        .range-val { text-align: right; font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; }
         .file-upload-btn { display: block; width: 100%; padding: 14px; background: #252536; border: 2px dashed var(--primary); border-radius: 12px; text-align: center; color: var(--text); font-weight: 600; cursor: pointer; margin-bottom: 8px; }
         .btn { display: block; width: 100%; padding: 14px; background: var(--primary); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; text-align: center; }
         .btn:disabled { background: #3a3a4f; color: var(--text-secondary); cursor: not-allowed; }
-        .file-list { font-size: 13px; color: var(--text-secondary); margin-top: 8px; max-height: 100px; overflow-y: auto; }
         
-        /* 預覽與播放控制區 */
-        .preview-container { width: 100%; background: #000; border-radius: 10px; overflow: hidden; position: relative; aspect-ratio: 9/16; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); }
-        canvas#previewCanvas { width: 100%; height: 100%; object-fit: contain; }
-        .preview-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-        .mini-btn { background: #2c2c3e; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
-
-        /* 視覺化時間軸拉桿 (Trim Slider) */
-        .slider-group { background: #12121a; padding: 12px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 12px; }
-        .slider-title { font-size: 12px; color: var(--text-secondary); display: flex; justify-content: space-between; margin-bottom: 6px; }
+        /* 獨立影片設定卡片 */
+        .video-item-card { background: #12121a; border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+        .video-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 8px; word-break: break-all; }
+        .preview-container { width: 100%; background: #000; border-radius: 8px; overflow: hidden; position: relative; aspect-ratio: 9/16; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; }
+        .preview-canvas { width: 100%; height: 100%; object-fit: contain; }
+        .slider-group { background: #1a1a24; padding: 10px; border-radius: 8px; margin-bottom: 10px; }
+        .slider-title { font-size: 11px; color: var(--text-secondary); display: flex; justify-content: space-between; margin-bottom: 4px; }
+        
+        .global-settings { background: #161622; border: 1px dashed var(--border); border-radius: 12px; padding: 14px; margin-bottom: 16px; }
         
         .progress-box { margin-top: 12px; display: none; }
         .progress-bar-bg { width: 100%; height: 8px; background: #12121a; border-radius: 4px; overflow: hidden; margin-top: 6px; }
@@ -49,62 +47,29 @@
 </head>
 <body>
 
-    <h1>✨ 演唱會 4K 影片浮水印工具</h1>
-    <div class="subtitle">視覺化拖曳剪輯 ｜ 浮水印切換 ｜ 防呆獨立下載</div>
+    <h1>✨ 演唱會 4K 獨立批次工具</h1>
+    <div class="subtitle">每支影片自訂範圍與浮水印 ｜ 自動記憶設定 ｜ 防呆獨立下載</div>
 
-    <!-- 步驟 1：選擇影片與時間軸剪輯 -->
+    <!-- 步驟 1：選擇多個影片 -->
     <div class="card">
-        <h2>📁 1. 選擇影片與剪輯範圍</h2>
-        <label class="file-upload-btn" for="videoInput">點此從手機相簿選取影片</label>
+        <h2>📁 1. 選擇多支 4K 影片</h2>
+        <label class="file-upload-btn" for="videoInput">點此從手機相簿選取影片 (可多選)</label>
         <input type="file" id="videoInput" accept="video/*" multiple style="display: none;">
-        <div id="fileList" class="file-list">尚未選擇檔案</div>
-
-        <div id="clipSection" style="display: none; margin-top: 14px;">
-            <div class="slider-group">
-                <div class="slider-title">
-                    <span>🎬 開始位置</span>
-                    <span id="startDisp">0.0 秒</span>
-                </div>
-                <input type="range" id="startSlider" min="0" max="100" value="0" step="0.1" oninput="onRangeChange('start')">
-
-                <div class="slider-title" style="margin-top: 10px;">
-                    <span>🏁 結束位置</span>
-                    <span id="endDisp">0.0 秒</span>
-                </div>
-                <input type="range" id="endSlider" min="0" max="100" value="100" step="0.1" oninput="onRangeChange('end')">
-            </div>
-            <div style="font-size: 11px; color: var(--text-secondary); text-align: center;">💡 剪輯範圍設定會套用到本次批次匯出的所有影片</div>
-        </div>
+        <div id="fileSummary" style="font-size: 13px; color: var(--text-secondary);">尚未選擇檔案</div>
     </div>
 
-    <!-- 步驟 2：浮水印選取與即時預覽 -->
-    <div class="card">
-        <h2>👁️ 2. 選擇浮水印與即時預覽</h2>
+    <!-- 全局預設浮水印設定 (會自動記憶) -->
+    <div class="global-settings">
+        <h2 style="font-size: 14px; margin-bottom: 10px; color: var(--primary);">⚙️ 全局浮水印樣式設定 (自動記憶)</h2>
         
-        <div class="preview-container">
-            <canvas id="previewCanvas"></canvas>
-        </div>
-
-        <div class="preview-controls">
-            <button class="mini-btn" id="playBtn" onclick="togglePlay()">▶️ 預覽播放範圍</button>
-            <span style="font-size: 11px; color: var(--text-secondary);" id="timeDisplay">00:00 / 00:00</span>
-        </div>
-
-        <!-- 浮水印文字選擇 -->
-        <label for="watermarkPreset">選擇浮水印內容</label>
-        <select id="watermarkPreset" onchange="onPresetChange()">
+        <label for="globalPreset">預設浮水印內容</label>
+        <select id="globalPreset" onchange="saveSettings(); updateAllPreviews();">
             <option value="boice114forever">boice114forever</option>
             <option value="joyce8651">joyce8651</option>
-            <option value="custom">自訂其他文字...</option>
         </select>
 
-        <div id="customTextGroup" style="display: none;">
-            <label for="customWatermarkText">輸入自訂浮水印</label>
-            <input type="text" id="customWatermarkText" placeholder="輸入浮水印文字" oninput="updatePreview()">
-        </div>
-
-        <label for="watermarkPosition">位置</label>
-        <select id="watermarkPosition" onchange="updatePreview()">
+        <label for="globalPosition">位置</label>
+        <select id="globalPosition" onchange="saveSettings(); updateAllPreviews();">
             <option value="bottom-right">右下角</option>
             <option value="bottom-left">左下角</option>
             <option value="top-right">右上角</option>
@@ -113,16 +78,22 @@
         </select>
 
         <label>透明度 (<span id="opacityVal">80</span>%)</label>
-        <input type="range" id="watermarkOpacity" min="10" max="100" value="80" oninput="document.getElementById('opacityVal').innerText=this.value; updatePreview();">
+        <input type="range" id="globalOpacity" min="10" max="100" value="80" oninput="document.getElementById('opacityVal').innerText=this.value; saveSettings(); updateAllPreviews();">
 
         <label>字體大小 (<span id="sizeVal">24</span>px)</label>
-        <input type="range" id="watermarkSize" min="12" max="60" value="24" oninput="document.getElementById('sizeVal').innerText=this.value; updatePreview();">
+        <input type="range" id="globalSize" min="12" max="60" value="24" oninput="document.getElementById('sizeVal').innerText=this.value; saveSettings(); updateAllPreviews();">
     </div>
 
-    <!-- 步驟 3：匯出與下載 -->
+    <!-- 步驟 2：各別影片詳細調整區 (每支影片一張卡片與即時預覽) -->
+    <div class="card" id="videoCardsContainer" style="display: none;">
+        <h2>🎞️ 2. 各影片範圍與獨立微調</h2>
+        <div id="cardsList"></div>
+    </div>
+
+    <!-- 步驟 3：開始輸出 -->
     <div class="card">
         <h2>🚀 3. 輸出與下載專區</h2>
-        <button id="processBtn" class="btn" disabled>開始批次製作浮水印</button>
+        <button id="processBtn" class="btn" disabled>開始逐一製作浮水印</button>
         
         <div id="progressBox" class="progress-box">
             <div id="progressStatus" style="font-size: 13px;">準備處理...</div>
@@ -132,170 +103,182 @@
             <div id="progressPercent" class="status-text">0%</div>
         </div>
 
-        <div id="downloadContainer" style="margin-top: 14px;">
-            <!-- 處理完成的影片會自動在此生成下載按鈕 -->
-        </div>
+        <div id="downloadContainer" style="margin-top: 14px;"></div>
     </div>
 
     <script>
         const videoInput = document.getElementById('videoInput');
-        const fileList = document.getElementById('fileList');
+        const fileSummary = document.getElementById('fileSummary');
+        const videoCardsContainer = document.getElementById('videoCardsContainer');
+        const cardsList = document.getElementById('cardsList');
         const processBtn = document.getElementById('processBtn');
         const progressBox = document.getElementById('progressBox');
         const progressBarFill = document.getElementById('progressBarFill');
         const progressStatus = document.getElementById('progressStatus');
         const progressPercent = document.getElementById('progressPercent');
         const downloadContainer = document.getElementById('downloadContainer');
-        const clipSection = document.getElementById('clipSection');
 
-        const startSlider = document.getElementById('startSlider');
-        const endSlider = document.getElementById('endSlider');
-        const startDisp = document.getElementById('startDisp');
-        const endDisp = document.getElementById('endDisp');
-        const playBtn = document.getElementById('playBtn');
-        const timeDisplay = document.getElementById('timeDisplay');
+        let videoProjects = []; // 存放每個影片物件的狀態
 
-        const previewCanvas = document.getElementById('previewCanvas');
-        const ctx = previewCanvas.getContext('2d');
+        // 載入時讀取記憶的位置與設定 (LocalStorage)
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedPreset = localStorage.getItem('wm_preset');
+            const savedPos = localStorage.getItem('wm_pos');
+            const savedOpacity = localStorage.getItem('wm_opacity');
+            const savedSize = localStorage.getItem('wm_size');
 
-        let selectedFiles = [];
-        let previewVideo = document.createElement('video');
-        previewVideo.muted = true;
-        previewVideo.playsInline = true;
-
-        let animFrameId = null;
-
-        videoInput.addEventListener('change', (e) => {
-            selectedFiles = Array.from(e.target.files);
-            if (selectedFiles.length > 0) {
-                fileList.innerHTML = `已選擇 ${selectedFiles.length} 個檔案：<br>` + selectedFiles.map(f => `• ${f.name}`).join('<br>');
-                processBtn.disabled = false;
-                clipSection.style.display = 'block';
-
-                previewVideo.src = URL.createObjectURL(selectedFiles[0]);
-                previewVideo.onloadedmetadata = () => {
-                    previewCanvas.width = 1080;
-                    previewCanvas.height = 1920;
-
-                    const dur = previewVideo.duration;
-                    startSlider.max = dur;
-                    endSlider.max = dur;
-                    startSlider.value = 0;
-                    endSlider.value = dur;
-
-                    startDisp.innerText = '0.0 秒';
-                    endDisp.innerText = dur.toFixed(1) + ' 秒';
-
-                    previewVideo.currentTime = 0;
-                    updatePreview();
-                };
-            } else {
-                fileList.innerHTML = '尚未選擇檔案';
-                processBtn.disabled = true;
-                clipSection.style.display = 'none';
+            if (savedPreset) document.getElementById('globalPreset').value = savedPreset;
+            if (savedPos) document.getElementById('globalPosition').value = savedPos;
+            if (savedOpacity) {
+                document.getElementById('globalOpacity').value = savedOpacity;
+                document.getElementById('opacityVal').innerText = savedOpacity;
+            }
+            if (savedSize) {
+                document.getElementById('globalSize').value = savedSize;
+                document.getElementById('sizeVal').innerText = savedSize;
             }
         });
 
-        function onPresetChange() {
-            const preset = document.getElementById('watermarkPreset').value;
-            const customGroup = document.getElementById('customTextGroup');
-            customGroup.style.display = (preset === 'custom') ? 'block' : 'none';
-            updatePreview();
+        function saveSettings() {
+            localStorage.setItem('wm_preset', document.getElementById('globalPreset').value);
+            localStorage.setItem('wm_pos', document.getElementById('globalPosition').value);
+            localStorage.setItem('wm_opacity', document.getElementById('globalOpacity').value);
+            localStorage.setItem('wm_size', document.getElementById('globalSize').value);
         }
 
-        function getActiveWatermarkText() {
-            const preset = document.getElementById('watermarkPreset').value;
-            if (preset === 'custom') {
-                return document.getElementById('customWatermarkText').value || 'Watermark';
-            }
-            return preset;
-        }
+        videoInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
 
-        function onRangeChange(type) {
-            let start = parseFloat(startSlider.value);
-            let end = parseFloat(endSlider.value);
+            fileSummary.innerText = `已選擇 ${files.length} 個影片檔案`;
+            videoCardsContainer.style.display = 'block';
+            cardsList.innerHTML = '';
+            videoProjects = [];
 
-            if (start >= end) {
-                if (type === 'start') startSlider.value = (end - 0.5 > 0) ? end - 0.5 : 0;
-                else endSlider.value = start + 0.5;
-            }
+            files.forEach((file, index) => {
+                const project = {
+                    id: index,
+                    file: file,
+                    videoEl: document.createElement('video'),
+                    canvas: null,
+                    ctx: null,
+                    startTime: 0,
+                    endTime: 0,
+                    duration: 0
+                };
 
-            start = parseFloat(startSlider.value);
-            end = parseFloat(endSlider.value);
+                project.videoEl.src = URL.createObjectURL(file);
+                project.videoEl.muted = true;
+                project.videoEl.playsInline = true;
 
-            startDisp.innerText = start.toFixed(1) + ' 秒';
-            endDisp.innerText = end.toFixed(1) + ' 秒';
+                // 建立卡片 UI
+                const cardDiv = document.createElement('div');
+                cardDiv.className = 'video-item-card';
+                cardDiv.innerHTML = `
+                    <div class="video-title">🎥 ${file.name}</div>
+                    <div class="preview-container">
+                        <canvas class="preview-canvas" id="canvas_${index}"></canvas>
+                    </div>
+                    <label>此影片專屬浮水印文字</label>
+                    <select id="preset_${index}">
+                        <option value="boice114forever" ${document.getElementById('globalPreset').value === 'boice114forever' ? 'selected' : ''}>boice114forever</option>
+                        <option value="joyce8651" ${document.getElementById('globalPreset').value === 'joyce8651' ? 'selected' : ''}>joyce8651</option>
+                    </select>
+                    
+                    <div class="slider-group" style="margin-top: 10px;">
+                        <div class="slider-title"><span>開始時間: <span id="start_disp_${index}">0.0s</span></span></div>
+                        <input type="range" id="start_slider_${index}" min="0" max="100" value="0" step="0.1">
+                        
+                        <div class="slider-title" style="margin-top: 8px;"><span>結束時間: <span id="end_disp_${index}">0.0s</span></span></div>
+                        <input type="range" id="end_slider_${index}" min="0" max="100" value="100" step="0.1">
+                    </div>
+                `;
+                cardsList.appendChild(cardDiv);
 
-            previewVideo.currentTime = (type === 'start') ? start : end;
-            updatePreview();
-        }
+                project.canvas = cardDiv.querySelector(`#canvas_${index}`);
+                project.ctx = project.canvas.getContext('2d');
 
-        function togglePlay() {
-            if (previewVideo.paused) {
-                const start = parseFloat(startSlider.value);
-                const end = parseFloat(endSlider.value);
-                if (previewVideo.currentTime < start || previewVideo.currentTime >= end) {
-                    previewVideo.currentTime = start;
-                }
-                previewVideo.play();
-                playBtn.innerText = '⏸️ 暫停預覽';
-                renderLoop();
-            } else {
-                previewVideo.pause();
-                playBtn.innerText = '▶️ 預覽播放範圍';
-                if (animFrameId) cancelAnimationFrame(animFrameId);
-            }
-        }
+                // 監聽影片載入完成
+                project.videoEl.onloadedmetadata = () => {
+                    project.duration = project.videoEl.duration;
+                    project.canvas.width = 1080;
+                    project.canvas.height = 1920;
+                    project.endTime = project.duration;
 
-        function renderLoop() {
-            if (previewVideo.paused || previewVideo.ended) return;
+                    const startSlider = cardDiv.querySelector(`#start_slider_${index}`);
+                    const endSlider = cardDiv.querySelector(`#end_slider_${index}`);
+                    const startDisp = cardDiv.querySelector(`#start_disp_${index}`);
+                    const endDisp = cardDiv.querySelector(`#end_disp_${index}`);
 
-            const end = parseFloat(endSlider.value);
-            if (previewVideo.currentTime >= end) {
-                previewVideo.pause();
-                playBtn.innerText = '▶️ 預覽播放範圍';
-                previewVideo.currentTime = parseFloat(startSlider.value);
-                updatePreview();
-                return;
-            }
+                    startSlider.max = project.duration;
+                    endSlider.max = project.duration;
+                    endSlider.value = project.duration;
+                    endDisp.innerText = project.duration.toFixed(1) + 's';
 
-            updatePreview();
-            timeDisplay.innerText = `${previewVideo.currentTime.toFixed(1)}s / ${parseFloat(endSlider.value).toFixed(1)}s`;
-            animFrameId = requestAnimationFrame(renderLoop);
-        }
+                    startSlider.oninput = () => {
+                        if (parseFloat(startSlider.value) >= parseFloat(endSlider.value)) {
+                            startSlider.value = parseFloat(endSlider.value) - 0.5;
+                        }
+                        project.startTime = parseFloat(startSlider.value);
+                        startDisp.innerText = project.startTime.toFixed(1) + 's';
+                        project.videoEl.currentTime = project.startTime;
+                        drawProjectPreview(project);
+                    };
 
-        function updatePreview() {
+                    endSlider.oninput = () => {
+                        if (parseFloat(endSlider.value) <= parseFloat(startSlider.value)) {
+                            endSlider.value = parseFloat(startSlider.value) + 0.5;
+                        }
+                        project.endTime = parseFloat(endSlider.value);
+                        endDisp.innerText = project.endTime.toFixed(1) + 's';
+                        project.videoEl.currentTime = project.endTime;
+                        drawProjectPreview(project);
+                    };
+
+                    project.videoEl.currentTime = 0;
+                    drawProjectPreview(project);
+                };
+
+                cardDiv.querySelector(`#preset_${index}`).onchange = () => drawProjectPreview(project);
+
+                videoProjects.push(project);
+            });
+
+            processBtn.disabled = false;
+        });
+
+        function drawProjectPreview(project) {
             const targetWidth = 1080;
             const targetHeight = 1920;
+            const ctx = project.ctx;
 
             ctx.clearRect(0, 0, targetWidth, targetHeight);
             ctx.fillStyle = '#12121a';
             ctx.fillRect(0, 0, targetWidth, targetHeight);
 
-            if (previewVideo.readyState >= 2) {
-                const srcWidth = previewVideo.videoWidth;
-                const srcHeight = previewVideo.videoHeight;
-
-                const sAspect = srcWidth / srcHeight;
+            if (project.videoEl.readyState >= 2) {
+                const srcW = project.videoEl.videoWidth;
+                const srcH = project.videoEl.videoHeight;
+                const sAspect = srcW / srcH;
                 const tAspect = 9 / 16;
-                let sw = srcWidth, sh = srcHeight, sx = 0, sy = 0;
+                let sw = srcW, sh = srcH, sx = 0, sy = 0;
 
                 if (sAspect > tAspect) {
-                    sw = srcHeight * tAspect;
-                    sx = (srcWidth - sw) / 2;
+                    sw = srcH * tAspect;
+                    sx = (srcW - sw) / 2;
                 } else {
-                    sh = srcWidth / tAspect;
-                    sy = (srcHeight - sh) / 2;
+                    sh = srcW / tAspect;
+                    sy = (srcH - sh) / 2;
                 }
-
-                ctx.drawImage(previewVideo, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
+                ctx.drawImage(project.videoEl, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
             }
 
-            // 繪製單一浮水印
-            const text = getActiveWatermarkText();
-            const position = document.getElementById('watermarkPosition').value;
-            const opacity = document.getElementById('watermarkOpacity').value / 100;
-            const fontSize = parseInt(document.getElementById('watermarkSize').value);
+            // 讀取設定與記憶位置
+            const cardDiv = cardsList.children[project.id];
+            const preset = cardDiv.querySelector(`#preset_${project.id}`).value;
+            const position = document.getElementById('globalPosition').value;
+            const opacity = document.getElementById('globalOpacity').value / 100;
+            const fontSize = parseInt(document.getElementById('globalSize').value);
 
             ctx.save();
             ctx.globalAlpha = opacity;
@@ -305,9 +288,8 @@
             ctx.shadowBlur = 6;
 
             const padding = 30;
-            const metrics = ctx.measureText(text);
+            const metrics = ctx.measureText(preset);
             const textWidth = metrics.width;
-            const textHeight = fontSize;
             let x = padding, y = targetHeight - padding;
 
             if (position === 'bottom-right') {
@@ -318,50 +300,54 @@
                 y = targetHeight - padding;
             } else if (position === 'top-right') {
                 x = targetWidth - textWidth - padding;
-                y = padding + textHeight;
+                y = padding + fontSize;
             } else if (position === 'top-left') {
                 x = padding;
-                y = padding + textHeight;
+                y = padding + fontSize;
             } else if (position === 'center') {
                 x = (targetWidth - textWidth) / 2;
                 y = targetHeight / 2;
             }
 
-            ctx.fillText(text, x, y);
+            ctx.fillText(preset, x, y);
             ctx.restore();
         }
 
+        function updateAllPreviews() {
+            videoProjects.forEach(p => drawProjectPreview(p));
+        }
+
         processBtn.addEventListener('click', async () => {
-            if (selectedFiles.length === 0) return;
+            if (videoProjects.length === 0) return;
 
             processBtn.disabled = true;
             progressBox.style.display = 'block';
 
-            const position = document.getElementById('watermarkPosition').value;
-            const opacity = document.getElementById('watermarkOpacity').value / 100;
-            const fontSize = parseInt(document.getElementById('watermarkSize').value);
-            const text = getActiveWatermarkText();
-            const startTime = parseFloat(startSlider.value);
-            const endTime = parseFloat(endSlider.value);
+            const position = document.getElementById('globalPosition').value;
+            const opacity = document.getElementById('globalOpacity').value / 100;
+            const fontSize = parseInt(document.getElementById('globalSize').value);
 
-            for (let i = 0; i < selectedFiles.length; i++) {
-                const file = selectedFiles[i];
-                progressStatus.innerText = `正在處理 (${i + 1}/${selectedFiles.length}): ${file.name}`;
-                
+            for (let i = 0; i < videoProjects.length; i++) {
+                const p = videoProjects[i];
+                const cardDiv = cardsList.children[p.id];
+                const text = cardDiv.querySelector(`#preset_${p.id}`).value;
+
+                progressStatus.innerText = `正在處理 (${i + 1}/${videoProjects.length}): ${p.file.name}`;
+
                 try {
-                    await processVideo(file, text, position, opacity, fontSize, startTime, endTime, (progress) => {
+                    await processSingleVideo(p, text, position, opacity, fontSize, (progress) => {
                         const percent = Math.round(progress * 100);
                         progressBarFill.style.width = `${percent}%`;
                         progressPercent.innerText = `${percent}%`;
-                    }, (downloadUrl, fileName) => {
+                    }, (url, name) => {
                         const item = document.createElement('div');
                         item.className = 'download-item';
-                        item.innerHTML = `<span>✅ ${fileName}</span><a class="download-btn" href="${downloadUrl}" download="${fileName}">立即下載</a>`;
+                        item.innerHTML = `<span>✅ ${name}</span><a class="download-btn" href="${url}" download="${name}">立即下載</a>`;
                         downloadContainer.appendChild(item);
                     });
                 } catch (err) {
                     console.log(err);
-                    alert(`處理 ${file.name} 時發生錯誤。`);
+                    alert(`處理 ${p.file.name} 失敗。`);
                 }
             }
 
@@ -369,128 +355,113 @@
             processBtn.disabled = false;
         });
 
-        function processVideo(file, text, position, opacity, fontSize, startTime, endTime, onProgress, onComplete) {
+        function processSingleVideo(p, text, position, opacity, fontSize, onProgress, onComplete) {
             return new Promise((resolve, reject) => {
-                const video = document.createElement('video');
-                video.src = URL.createObjectURL(file);
-                video.crossOrigin = 'anonymous';
-                video.muted = true;
-                video.playsInline = true;
+                const video = p.videoEl;
+                const srcWidth = video.videoWidth;
+                const srcHeight = video.videoHeight;
+                const startTime = p.startTime;
+                const endTime = p.endTime;
 
-                video.onloadedmetadata = () => {
-                    const srcWidth = video.videoWidth;
-                    const srcHeight = video.videoHeight;
-                    const actualEndTime = (endTime > 0 && endTime <= video.duration) ? endTime : video.duration;
+                const canvas = document.createElement('canvas');
+                canvas.width = 1080;
+                canvas.height = 1920;
+                const ctx = canvas.getContext('2d');
 
-                    let targetHeight = 1920;
-                    let targetWidth = 1080;
+                const stream = canvas.captureStream(60);
+                try {
+                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    const source = audioCtx.createMediaElementSource(video);
+                    const dest = audioCtx.createMediaStreamDestination();
+                    source.connect(dest);
+                    source.connect(audioCtx.destination);
+                    if (dest.stream.getAudioTracks().length > 0) {
+                        stream.addTrack(dest.stream.getAudioTracks()[0]);
+                    }
+                } catch (e) { console.log("音訊擷取略過", e); }
 
-                    const canvas = document.createElement('canvas');
-                    canvas.width = targetWidth;
-                    canvas.height = targetHeight;
-                    const ctx = canvas.getContext('2d');
+                let mimeType = 'video/webm;codecs=vp9,opus';
+                if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm';
+                if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = '';
 
-                    const stream = canvas.captureStream(60);
-                    try {
-                        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                        const source = audioCtx.createMediaElementSource(video);
-                        const dest = audioCtx.createMediaStreamDestination();
-                        source.connect(dest);
-                        source.connect(audioCtx.destination);
-                        if (dest.stream.getAudioTracks().length > 0) {
-                            stream.addTrack(dest.stream.getAudioTracks()[0]);
-                        }
-                    } catch (e) { console.log("音訊擷取略過", e); }
+                const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+                const chunks = [];
 
-                    let mimeType = 'video/webm;codecs=vp9,opus';
-                    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm';
-                    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = '';
-
-                    const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
-                    const chunks = [];
-                    
-                    mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
-                    mediaRecorder.onstop = () => {
-                        const blob = new Blob(chunks, { type: 'video/mp4' });
-                        const url = URL.createObjectURL(blob);
-                        const outName = `watermarked_${file.name.replace(/\.[^/.]+$/, "")}.mp4`;
-                        onComplete(url, outName);
-                        resolve();
-                    };
-
-                    video.currentTime = startTime;
-                    video.onseeked = () => {
-                        mediaRecorder.start();
-                        video.play();
-
-                        function drawFrame() {
-                            if (video.paused || video.ended || video.currentTime >= actualEndTime) {
-                                video.pause();
-                                if (mediaRecorder.state !== 'inactive') {
-                                    mediaRecorder.stop();
-                                }
-                                return;
-                            }
-
-                            const sAspect = srcWidth / srcHeight;
-                            const tAspect = 9 / 16;
-                            let sw = srcWidth, sh = srcHeight, sx = 0, sy = 0;
-
-                            if (sAspect > tAspect) {
-                                sw = srcHeight * tAspect;
-                                sx = (srcWidth - sw) / 2;
-                            } else {
-                                sh = srcWidth / tAspect;
-                                sy = (srcHeight - sh) / 2;
-                            }
-
-                            ctx.clearRect(0, 0, targetWidth, targetHeight);
-                            ctx.drawImage(video, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
-
-                            // 繪製選擇的單一浮水印
-                            ctx.save();
-                            ctx.globalAlpha = opacity;
-                            ctx.font = `${fontSize * (targetHeight / 1080)}px sans-serif`;
-                            ctx.fillStyle = '#ffffff';
-                            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-                            ctx.shadowBlur = 6;
-
-                            const padding = 30;
-                            const metrics = ctx.measureText(text);
-                            const textWidth = metrics.width;
-                            const textHeight = fontSize;
-                            let x = padding, y = targetHeight - padding;
-
-                            if (position === 'bottom-right') {
-                                x = targetWidth - textWidth - padding;
-                                y = targetHeight - padding;
-                            } else if (position === 'bottom-left') {
-                                x = padding;
-                                y = targetHeight - padding;
-                            } else if (position === 'top-right') {
-                                x = targetWidth - textWidth - padding;
-                                y = padding + textHeight;
-                            } else if (position === 'top-left') {
-                                x = padding;
-                                y = padding + textHeight;
-                            } else if (position === 'center') {
-                                x = (targetWidth - textWidth) / 2;
-                                y = targetHeight / 2;
-                            }
-
-                            ctx.fillText(text, x, y);
-                            ctx.restore();
-
-                            const progress = (video.currentTime - startTime) / (actualEndTime - startTime);
-                            onProgress(Math.min(Math.max(progress, 0), 1));
-                            requestAnimationFrame(drawFrame);
-                        }
-
-                        drawFrame();
-                    };
+                mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'video/mp4' });
+                    const url = URL.createObjectURL(blob);
+                    const outName = `watermarked_${p.file.name.replace(/\.[^/.]+$/, "")}.mp4`;
+                    onComplete(url, outName);
+                    resolve();
                 };
 
-                video.onerror = (e) => reject(e);
+                video.currentTime = startTime;
+                video.onseeked = () => {
+                    mediaRecorder.start();
+                    video.play();
+
+                    function drawFrame() {
+                        if (video.paused || video.ended || video.currentTime >= endTime) {
+                            video.pause();
+                            if (mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+                            return;
+                        }
+
+                        const sAspect = srcWidth / srcHeight;
+                        const tAspect = 9 / 16;
+                        let sw = srcWidth, sh = srcHeight, sx = 0, sy = 0;
+
+                        if (sAspect > tAspect) {
+                            sw = srcHeight * tAspect;
+                            sx = (srcWidth - sw) / 2;
+                        } else {
+                            sh = srcWidth / tAspect;
+                            sy = (srcHeight - sh) / 2;
+                        }
+
+                        ctx.clearRect(0, 0, 1080, 1920);
+                        ctx.drawImage(video, sx, sy, sw, sh, 0, 0, 1080, 1920);
+
+                        ctx.save();
+                        ctx.globalAlpha = opacity;
+                        ctx.font = `${fontSize * (1920 / 1080)}px sans-serif`;
+                        ctx.fillStyle = '#ffffff';
+                        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+                        ctx.shadowBlur = 6;
+
+                        const padding = 30;
+                        const metrics = ctx.measureText(text);
+                        const textWidth = metrics.width;
+                        let x = padding, y = 1920 - padding;
+
+                        if (position === 'bottom-right') {
+                            x = 1080 - textWidth - padding;
+                            y = 1920 - padding;
+                        } else if (position === 'bottom-left') {
+                            x = padding;
+                            y = 1920 - padding;
+                        } else if (position === 'top-right') {
+                            x = 1080 - textWidth - padding;
+                            y = padding + fontSize;
+                        } else if (position === 'top-left') {
+                            x = padding;
+                            y = padding + fontSize;
+                        } else if (position === 'center') {
+                            x = (1080 - textWidth) / 2;
+                            y = 1920 / 2;
+                        }
+
+                        ctx.fillText(text, x, y);
+                        ctx.restore();
+
+                        const progress = (video.currentTime - startTime) / (endTime - startTime);
+                        onProgress(Math.min(Math.max(progress, 0), 1));
+                        requestAnimationFrame(drawFrame);
+                    }
+
+                    drawFrame();
+                };
             });
         }
     </script>
